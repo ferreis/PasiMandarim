@@ -1,0 +1,28 @@
+# Dependências
+node_modules/
+
+# Saídas de build e cache do Vite
+dist/
+.vite/
+*.tsbuildinfo
+
+# Áudios baixados localmente pelo comando `npm run audio:sync`
+public/audio/
+
+# Variáveis locais (preserva arquivos de exemplo versionáveis)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Logs, cobertura e arquivos do sistema
+*.log
+coverage/
+.DS_Store
+Thumbs.db
+
+# Configurações locais de IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
