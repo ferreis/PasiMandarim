@@ -1,0 +1,26 @@
+{
+  "initials": [
+    {"value":"","label":"Sem inicial","finals":["a","o","e","ai","ei","ao","ou","an","en","ang","eng","er","i","ia","iao","ie","iu","ian","in","iang","ing","iong","u","ua","uo","uai","ui","uan","un","uang","ueng","ü","üe","üan","ün"]},
+    {"value":"b","label":"b","finals":["a","o","ai","ei","ao","an","en","ang","eng","i","iao","ie","ian","in","ing","u"]},
+    {"value":"p","label":"p","finals":["a","o","ai","ei","ao","ou","an","en","ang","eng","i","iao","ie","ian","in","ing","u"]},
+    {"value":"m","label":"m","finals":["a","o","e","ai","ei","ao","ou","an","en","ang","eng","i","iao","ie","iu","ian","in","ing","u"]},
+    {"value":"f","label":"f","finals":["a","o","ei","ou","an","en","ang","eng","u"]},
+    {"value":"d","label":"d","finals":["a","e","ai","ei","ao","ou","an","en","ang","eng","i","ia","iao","ie","iu","ian","ing","u","uo","ui","uan","un","ong"]},
+    {"value":"t","label":"t","finals":["a","e","ai","ao","ou","an","ang","eng","i","iao","ie","ian","ing","u","uo","ui","uan","un","ong"]},
+    {"value":"n","label":"n","finals":["a","e","ai","ei","ao","ou","an","en","ang","eng","i","iao","ie","iu","ian","in","iang","ing","u","uo","uan","ong","ü","üe"]},
+    {"value":"l","label":"l","finals":["a","e","ai","ei","ao","ou","an","ang","eng","i","ia","iao","ie","iu","ian","in","iang","ing","u","uo","uan","un","ong","ü","üe"]},
+    {"value":"g","label":"g","finals":["a","e","ai","ei","ao","ou","an","en","ang","eng","u","ua","uo","uai","ui","uan","un","uang","ong"]},
+    {"value":"k","label":"k","finals":["a","e","ai","ao","ou","an","en","ang","eng","u","ua","uo","uai","ui","uan","un","uang","ong"]},
+    {"value":"h","label":"h","finals":["a","e","ai","ei","ao","ou","an","en","ang","eng","u","ua","uo","uai","ui","uan","un","uang","ong"]},
+    {"value":"j","label":"j","finals":["i","ia","iao","ie","iu","ian","in","iang","ing","iong","ü","üe","üan","ün"]},
+    {"value":"q","label":"q","finals":["i","ia","iao","ie","iu","ian","in","iang","ing","iong","ü","üe","üan","ün"]},
+    {"value":"x","label":"x","finals":["i","ia","iao","ie","iu","ian","in","iang","ing","iong","ü","üe","üan","ün"]},
+    {"value":"zh","label":"zh","finals":["a","e","ai","ei","ao","ou","an","en","ang","eng","i","u","ua","uo","uai","ui","uan","un","uang","ong"]},
+    {"value":"ch","label":"ch","finals":["a","e","ai","ao","ou","an","en","ang","eng","i","u","ua","uo","uai","ui","uan","un","uang","ong"]},
+    {"value":"sh","label":"sh","finals":["a","e","ai","ei","ao","ou","an","en","ang","eng","i","u","ua","uo","uai","ui","uan","un","uang"]},
+    {"value":"r","label":"r","finals":["e","ao","ou","an","en","ang","eng","i","u","uo","ui","uan","un","ong"]},
+    {"value":"z","label":"z","finals":["a","e","ai","ei","ao","ou","an","en","ang","eng","i","u","uo","ui","uan","un","ong"]},
+    {"value":"c","label":"c","finals":["a","e","ai","ao","ou","an","en","ang","eng","i","u","uo","ui","uan","un","ong"]},
+    {"value":"s","label":"s","finals":["a","e","ai","ao","ou","an","en","ang","eng","i","u","uo","ui","uan","un","ong"]}
+  ]
+}

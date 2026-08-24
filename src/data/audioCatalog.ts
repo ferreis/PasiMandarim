@@ -1,82 +1,74 @@
-import type { AudioMinimalPair, AudioResearchCandidate } from '../types/audio'
+import { generatedAudioSamples } from './generatedAudioCatalog'
+import type { HumanAudioSample, MandarinTone } from '../types/audio'
 
 const ccBy20Fr = {
   name: 'CC BY 2.0 FR',
   url: 'https://creativecommons.org/licenses/by/2.0/fr/',
 }
 
-export const verifiedAudioPairs: AudioMinimalPair[] = [
+const curatedRemoteSamples: HumanAudioSample[] = [
   {
-    id: 'bp-ian-1-wei-gao',
-    contrast: 'b-p',
+    key: 'b|ian|1',
+    pinyin: 'biān',
+    hanzi: '边',
+    initial: 'b',
     final: 'ian',
     tone: 1,
-    sameSpeaker: true,
-    verified: true,
-    left: {
-      pinyin: 'biān',
-      hanzi: '边',
-      initial: 'b',
-      final: 'ian',
-      tone: 1,
-      audioUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Zh-bi%C4%81n.ogg',
-      sourcePage: 'https://commons.wikimedia.org/wiki/File:Zh-bi%C4%81n.ogg',
-      speaker: 'Wei Gao',
-      speakerOrigin: 'Pequim, China',
-      source: 'Shtooka Project / Wikimedia Commons',
-      credits: 'Wei Gao e Vion Nicolas',
-      license: ccBy20Fr,
-      verifiedHuman: true,
-    },
-    right: {
-      pinyin: 'piān',
-      hanzi: '篇',
-      initial: 'p',
-      final: 'ian',
-      tone: 1,
-      audioUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Zh-pi%C4%81n.ogg',
-      sourcePage: 'https://commons.wikimedia.org/wiki/File:Zh-pi%C4%81n.ogg',
-      speaker: 'Wei Gao',
-      speakerOrigin: 'Pequim, China',
-      source: 'Shtooka Project / Wikimedia Commons',
-      credits: 'Wei Gao e Vion Nicolas',
-      license: ccBy20Fr,
-      verifiedHuman: true,
-    },
+    audioUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Zh-bi%C4%81n.ogg',
+    originalAudioUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Zh-bi%C4%81n.ogg',
+    sourcePage: 'https://commons.wikimedia.org/wiki/File:Zh-bi%C4%81n.ogg',
+    speakerId: 'wei-gao',
+    speaker: 'Wei Gao',
+    speakerOrigin: 'Pequim, China',
+    source: 'Shtooka Project / Wikimedia Commons',
+    credits: 'Wei Gao e Vion Nicolas',
+    license: ccBy20Fr,
+    localFile: false,
+    verifiedHuman: true,
+  },
+  {
+    key: 'p|ian|1',
+    pinyin: 'piān',
+    hanzi: '篇',
+    initial: 'p',
+    final: 'ian',
+    tone: 1,
+    audioUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Zh-pi%C4%81n.ogg',
+    originalAudioUrl: 'https://commons.wikimedia.org/wiki/Special:FilePath/Zh-pi%C4%81n.ogg',
+    sourcePage: 'https://commons.wikimedia.org/wiki/File:Zh-pi%C4%81n.ogg',
+    speakerId: 'wei-gao',
+    speaker: 'Wei Gao',
+    speakerOrigin: 'Pequim, China',
+    source: 'Shtooka Project / Wikimedia Commons',
+    credits: 'Wei Gao e Vion Nicolas',
+    license: ccBy20Fr,
+    localFile: false,
+    verifiedHuman: true,
   },
 ]
 
-// Estes pares foram encontrados no acervo, mas ainda não são liberados no treino.
-// Só passam para verifiedAudioPairs após confirmar os dois arquivos, o falante e a licença.
-export const audioResearchCandidates: AudioResearchCandidate[] = [
-  {
-    id: 'bp-ao-3',
-    contrast: 'b-p',
-    final: 'ao',
-    tone: 3,
-    leftPinyin: 'bǎo',
-    rightPinyin: 'pǎo',
-    status: 'pending-verification',
-    note: 'bǎo está confirmado como Wei Gao; falta validar os metadados completos de pǎo.',
-  },
-  {
-    id: 'bp-ian-4',
-    contrast: 'b-p',
-    final: 'ian',
-    tone: 4,
-    leftPinyin: 'biàn',
-    rightPinyin: 'piàn',
-    status: 'pending-verification',
-    note: 'biàn está confirmado como Wei Gao; falta validar os metadados completos de piàn.',
-  },
-  {
-    id: 'bp-ai-2',
-    contrast: 'b-p',
-    final: 'ai',
-    tone: 2,
-    leftPinyin: 'bái',
-    rightPinyin: 'pái',
-    status: 'pending-verification',
-    note: 'bái está confirmado como Wei Gao; falta validar os metadados completos de pái.',
-  },
-]
+const sampleMap = new Map<string, HumanAudioSample>()
+
+for (const sample of curatedRemoteSamples) sampleMap.set(sample.key, sample)
+for (const sample of generatedAudioSamples) sampleMap.set(sample.key, sample)
+
+export const humanAudioSamples = [...sampleMap.values()]
+
+export function audioSampleKey(initial: string, final: string, tone: MandarinTone): string {
+  return `${initial}|${final}|${tone}`
+}
+
+export function findHumanAudioSample(
+  initial: string,
+  final: string,
+  tone: MandarinTone,
+): HumanAudioSample | undefined {
+  return sampleMap.get(audioSampleKey(initial, final, tone))
+}
+
+export function samplesUseSameSpeaker(
+  left?: HumanAudioSample,
+  right?: HumanAudioSample,
+): boolean {
+  return Boolean(left && right && left.speakerId === right.speakerId)
+}
