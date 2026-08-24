@@ -6,6 +6,9 @@ dist/
 .vite/
 *.tsbuildinfo
 
+# Cache local dos pacotes de áudio Shtooka/SWAC
+.cache/
+
 # Áudios baixados localmente pelo comando `npm run audio:sync`
 public/audio/
 

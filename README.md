@@ -10,7 +10,7 @@ O exercício mantém **final + tom** iguais e altera somente a inicial. Exemplo:
 - `dā` × `tā`
 - `gā` × `kā`
 
-A interface permite escolher **Inicial A**, **Inicial B**, uma **Final comum válida** e o **Tom**. Combinações que não existem no mandarim não são oferecidas.
+A interface permite escolher **Inicial A**, **Inicial B**, uma **Final comum válida** e o **Tom**. Para o treino auditivo, finais e tons são filtrados para mostrar apenas combinações que possuam gravação humana catalogada nos dois lados.
 
 ## Princípios
 
@@ -47,10 +47,13 @@ A sessão mantém uma contagem simples de acertos e total de respostas.
 - TypeScript
 - HTML Audio API
 - Node.js 22+ para sincronização do acervo
+- `tar` com suporte a XZ para extrair os pacotes completos Shtooka/SWAC
 
 ## Matriz de Pinyin
 
 A matriz compartilhada fica em `data/pinyin-matrix.json` e contém as combinações válidas de iniciais e finais usadas pelo frontend e pelo sincronizador de áudio.
+
+A matriz de inicial + final é fonotática. Isso não significa que todos os cinco tons existam como palavras reais para toda sílaba. Por exemplo, duas iniciais podem aceitar a final `a`, mas um dos tons pode não possuir uma sílaba lexical correspondente ou uma gravação isolada disponível. Por isso o seletor de tom usa a interseção dos áudios realmente catalogados.
 
 O sistema trata as regras ortográficas especiais do Pinyin. Exemplos:
 
@@ -62,12 +65,12 @@ O sistema trata as regras ortográficas especiais do Pinyin. Exemplos:
 
 ## Áudio humano
 
-O projeto prioriza dois acervos Shtooka disponíveis também no Wikimedia Commons:
+O projeto prioriza dois acervos Shtooka/SWAC preservados pelo mirror Yojik e também disponíveis parcialmente no Wikimedia Commons:
 
-1. **Wei Gao** — falante de Pequim, gravações de 2006, créditos Wei Gao e Vion Nicolas, CC BY 2.0 FR.
-2. **Yue Tan** — falante de Liaoning, gravações de 2009, CC BY-SA 3.0 US.
+1. **Yue Tan** — falante de Liaoning, coleção `cmn-caen-tan`, 8.597 gravações, CC BY-SA 3.0 US.
+2. **Wei Gao** — falante de Pequim, coleção `cmn-balm-hsk1`, cerca de 1.000 gravações, créditos Wei Gao e Vion Nicolas, CC BY 2.0 FR.
 
-O frontend nunca considera uma amostra válida apenas porque existe um arquivo com o nome esperado. O sincronizador verifica os metadados do Wikimedia Commons e só aceita arquivos associados ao Shtooka e a um falante humano conhecido.
+O pacote maior de Yue Tan é processado primeiro para aumentar a chance de os dois lados de uma comparação usarem a mesma pessoa.
 
 ### Baixar os áudios diretamente
 
@@ -76,16 +79,20 @@ npm install
 npm run audio:sync
 ```
 
-O comando:
+O comando agora trabalha em duas etapas:
 
-1. lê todas as combinações válidas de `data/pinyin-matrix.json`;
-2. gera os cinco tons de cada sílaba;
-3. consulta o Wikimedia Commons em lotes;
-4. procura arquivos `Zh-*` e `Cmn-*` em OGG/OGA;
-5. verifica fonte, falante e licença;
-6. baixa as gravações aceitas para `public/audio/shtooka/`;
-7. gera `public/audio/shtooka/catalog.json`;
-8. reescreve `src/data/generatedAudioCatalog.ts` apontando para os arquivos locais.
+1. lê todas as combinações de `data/pinyin-matrix.json`;
+2. baixa os pacotes completos Shtooka/SWAC do mirror Yojik;
+3. extrai os arquivos FLAC e lê o `index.tags.txt` original de cada coleção;
+4. aceita apenas entradas monossilábicas que possam ser mapeadas com segurança para inicial + final + tom;
+5. copia essas gravações para `public/audio/shtooka/`;
+6. consulta o Wikimedia Commons apenas para tentar preencher as lacunas restantes;
+7. no Commons, verifica Shtooka, falante humano conhecido e licença Creative Commons;
+8. gera `public/audio/shtooka/catalog.json`;
+9. reescreve `src/data/generatedAudioCatalog.ts` apontando para os arquivos locais;
+10. informa no terminal a cobertura final da matriz e quantas combinações continuam sem gravação isolada.
+
+Os pacotes baixados e extraídos ficam em `.cache/shtooka/` e não são versionados.
 
 Para baixar novamente arquivos já existentes:
 
@@ -95,6 +102,18 @@ npm run audio:sync:force
 
 Depois da sincronização, o navegador reproduz os arquivos locais e não precisa consultar o Wikimedia para esses áudios.
 
+## Por que ainda pode faltar um tom?
+
+O contador de gravações não significa cobertura completa da matriz. Ele representa quantas combinações `inicial + final + tom` foram encontradas com gravação humana isolada e verificável.
+
+Nem toda combinação teórica possui uma palavra real em mandarim. Além disso, uma palavra pode existir, mas não estar presente nas coleções abertas usadas pelo projeto. O sistema não cria áudio sintético para preencher essas lacunas.
+
+Para evitar exercícios quebrados, a interface:
+
+- mostra apenas finais que possuem pelo menos um mesmo tom gravado para A e B;
+- mostra apenas tons com gravação humana nos dois lados;
+- não exibe um flashcard quando não há um par reproduzível.
+
 ## Estrutura
 
 ```text
@@ -103,6 +122,9 @@ data/
 
 scripts/
 └── sync-human-audio.mjs
+
+.cache/
+└── shtooka/
 
 public/
 └── audio/
@@ -132,6 +154,7 @@ npm run dev
 Validação:
 
 ```bash
+node --check scripts/sync-human-audio.mjs
 npm run typecheck
 npm run build
 ```
@@ -146,11 +169,11 @@ Cada gravação aceita registra:
 - tom;
 - caractere, quando disponível nos metadados;
 - arquivo local;
-- URL original;
-- página original no Commons;
+- URL/pacote original;
+- página da fonte;
 - falante;
 - origem do falante;
 - créditos;
 - licença.
 
-Quando os dois lados de uma comparação possuem áudio, a interface informa se eles foram gravados pelo mesmo falante. Quando uma combinação ainda não possui gravação humana validada, o botão de áudio permanece desativado.
+O projeto nunca usa TTS ou voz gerada por IA para completar automaticamente uma combinação ausente.
