@@ -22,6 +22,24 @@ A interface permite escolher **Inicial A**, **Inicial B**, uma **Final comum vá
 - Preferência por comparar gravações do mesmo falante.
 - Áudios podem ser baixados e usados localmente.
 
+## Teste flashcard auditivo
+
+O flashcard usa a mesma seleção de **Inicial A**, **Inicial B**, **Final** e **Tom** do modo de comparação.
+
+A cada rodada:
+
+1. o sistema sorteia criptograficamente qual áudio será usado, A ou B;
+2. a ordem visual das duas opções de resposta também é embaralhada;
+3. o usuário precisa reproduzir o áudio antes de responder;
+4. a sílaba correta permanece escondida durante a pergunta;
+5. o usuário escolhe **Inicial A** ou **Inicial B**;
+6. somente depois da resposta o sistema informa acerto/erro e revela a sílaba;
+7. a próxima rodada faz um novo sorteio independente.
+
+O teste só é habilitado quando existem gravações humanas validadas para os dois lados. Se as duas iniciais selecionadas forem iguais, o flashcard é bloqueado por não haver contraste a identificar.
+
+A sessão mantém uma contagem simples de acertos e total de respostas.
+
 ## Stack
 
 - Vue 3
