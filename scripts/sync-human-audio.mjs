@@ -8,6 +8,11 @@ const generatedCatalogPath = path.join(root, 'src', 'data', 'generatedAudioCatal
 const audioRoot = path.join(root, 'public', 'audio', 'shtooka')
 const publicCatalogPath = path.join(audioRoot, 'catalog.json')
 const force = process.argv.includes('--force')
+const audioDownloadConcurrency = 1
+const audioDownloadIntervalMilliseconds = 1_500
+const maximumDownloadAttempts = 8
+
+let lastAudioDownloadStartedAt = 0
 
 const userAgent = 'LearningMandarin/0.1 (+https://github.com/ferreis/learning_Mandarin)'
 const commonsApi = 'https://commons.wikimedia.org/w/api.php'
@@ -82,8 +87,14 @@ function applyToneMark(base, tone) {
   return `${base.slice(0, index)}${marked}${base.slice(index + 1)}`
 }
 
-function stripHtml(value = '') {
-  return value
+function stripHtml(value) {
+  const rawText = Array.isArray(value)
+    ? value.map((entry) => stripHtml(entry)).join(' ')
+    : typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+      ? String(value)
+      : ''
+
+  return rawText
     .replace(/<[^>]+>/g, ' ')
     .replace(/&quot;/g, '"')
     .replace(/&#039;|&apos;/g, "'")
@@ -211,6 +222,50 @@ async function exists(filePath) {
   }
 }
 
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+function retryDelayMilliseconds(response, attempt) {
+  const retryAfterSeconds = Number(response.headers.get('retry-after'))
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0) {
+    return retryAfterSeconds * 1000
+  }
+
+  return Math.min(2_000 * 2 ** attempt, 60_000)
+}
+
+async function waitForAudioDownloadSlot() {
+  const earliestNextDownloadAt = lastAudioDownloadStartedAt + audioDownloadIntervalMilliseconds
+  const remainingDelay = earliestNextDownloadAt - Date.now()
+
+  if (remainingDelay > 0) {
+    await wait(remainingDelay)
+  }
+
+  lastAudioDownloadStartedAt = Date.now()
+}
+
+async function downloadAudio(url) {
+  for (let attempt = 0; attempt < maximumDownloadAttempts; attempt += 1) {
+    await waitForAudioDownloadSlot()
+    const response = await fetch(url, { headers: { 'User-Agent': userAgent } })
+    if (response.ok) return response
+
+    const isTemporaryFailure = response.status === 429 || response.status >= 500
+    const hasMoreAttempts = attempt < maximumDownloadAttempts - 1
+    if (!isTemporaryFailure || !hasMoreAttempts) {
+      throw new Error(`HTTP ${response.status} ao baixar ${url}`)
+    }
+
+    const delay = retryDelayMilliseconds(response, attempt)
+    console.warn(`HTTP ${response.status}; tentando novamente em ${Math.ceil(delay / 1000)}s.`)
+    await wait(delay)
+  }
+
+  throw new Error(`Não foi possível baixar ${url}`)
+}
+
 async function downloadRecording(recording) {
   const { combo, page, imageInfo, metadata, speaker, license } = recording
   const extension = path.extname(new URL(imageInfo.url).pathname) || '.ogg'
@@ -221,8 +276,7 @@ async function downloadRecording(recording) {
   await mkdir(speakerDirectory, { recursive: true })
 
   if (force || !(await exists(filePath))) {
-    const response = await fetch(imageInfo.url, { headers: { 'User-Agent': userAgent } })
-    if (!response.ok) throw new Error(`HTTP ${response.status} ao baixar ${imageInfo.url}`)
+    const response = await downloadAudio(imageInfo.url)
     await writeFile(filePath, Buffer.from(await response.arrayBuffer()))
   }
 
@@ -272,7 +326,7 @@ async function main() {
   console.log(`${recordings.length} gravações Shtooka humanas verificáveis encontradas.`)
 
   await mkdir(audioRoot, { recursive: true })
-  const samples = await mapWithConcurrency(recordings, 6, downloadRecording)
+  const samples = await mapWithConcurrency(recordings, audioDownloadConcurrency, downloadRecording)
   samples.sort((a, b) => a.key.localeCompare(b.key))
 
   const generatedSource = `import type { HumanAudioSample } from '../types/audio'\n\nexport const generatedAudioSamples: HumanAudioSample[] = ${JSON.stringify(samples, null, 2)}\n`
