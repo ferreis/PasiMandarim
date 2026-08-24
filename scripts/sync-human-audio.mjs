@@ -1,12 +1,19 @@
-import { readFile, writeFile, mkdir, access } from 'node:fs/promises'
+import { createWriteStream } from 'node:fs'
+import { access, copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { promisify } from 'node:util'
+import { execFile } from 'node:child_process'
+import { pipeline } from 'node:stream/promises'
+import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 
+const execFileAsync = promisify(execFile)
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const matrixPath = path.join(root, 'data', 'pinyin-matrix.json')
 const generatedCatalogPath = path.join(root, 'src', 'data', 'generatedAudioCatalog.ts')
 const audioRoot = path.join(root, 'public', 'audio', 'shtooka')
 const publicCatalogPath = path.join(audioRoot, 'catalog.json')
+const cacheRoot = path.join(root, '.cache', 'shtooka')
 const force = process.argv.includes('--force')
 const audioDownloadConcurrency = 1
 const audioDownloadIntervalMilliseconds = 1_500
@@ -14,8 +21,9 @@ const maximumDownloadAttempts = 8
 
 let lastAudioDownloadStartedAt = 0
 
-const userAgent = 'LearningMandarin/0.1 (+https://github.com/ferreis/learning_Mandarin)'
+const userAgent = 'LearningMandarin/0.2 (+https://github.com/ferreis/learning_Mandarin)'
 const commonsApi = 'https://commons.wikimedia.org/w/api.php'
+const yojikBase = 'https://fsi-languages.yojik.eu/audiocollections'
 
 const speakers = [
   {
@@ -42,6 +50,25 @@ const speakers = [
   },
 ]
 
+// A coleção maior é processada primeiro para maximizar a chance de os dois lados
+// de um contraste usarem a mesma falante.
+const archiveCollections = [
+  {
+    id: 'cmn-caen-tan',
+    archiveUrl: `${yojikBase}/archives/cmn-caen-tan_flac.tar.xz`,
+    sourcePage: `${yojikBase}/detailled/cmn-caen-tan/readme.txt`,
+    source: 'University of Caen / Shtooka Project (Yojik mirror)',
+    speaker: speakers[1],
+  },
+  {
+    id: 'cmn-balm-hsk1',
+    archiveUrl: `${yojikBase}/archives/cmn-balm-hsk1_flac.tar.xz`,
+    sourcePage: `${yojikBase}/detailled/cmn-balm-hsk1/readme.txt`,
+    source: 'Shtooka Project (Yojik mirror)',
+    speaker: speakers[0],
+  },
+]
+
 const zeroInitialSpellings = {
   i: 'yi', ia: 'ya', iao: 'yao', ie: 'ye', iu: 'you', ian: 'yan', in: 'yin', iang: 'yang', ing: 'ying', iong: 'yong',
   u: 'wu', ua: 'wa', uo: 'wo', uai: 'wai', ui: 'wei', uan: 'wan', un: 'wen', uang: 'wang', ueng: 'weng',
@@ -55,6 +82,11 @@ const toneMarks = {
   o: ['ō', 'ó', 'ǒ', 'ò'],
   u: ['ū', 'ú', 'ǔ', 'ù'],
   ü: ['ǖ', 'ǘ', 'ǚ', 'ǜ'],
+}
+
+const toneCharacterMap = new Map()
+for (const [plain, marks] of Object.entries(toneMarks)) {
+  marks.forEach((marked, index) => toneCharacterMap.set(marked, { plain, tone: index + 1 }))
 }
 
 function buildPinyinBase(initial, final) {
@@ -85,6 +117,48 @@ function applyToneMark(base, tone) {
   const marked = toneMarks[base[index]]?.[tone - 1]
   if (!marked) return base
   return `${base.slice(0, index)}${marked}${base.slice(index + 1)}`
+}
+
+function numericPinyin(base, tone) {
+  return `${base.replaceAll('ü', 'v')}${tone}`.toLowerCase()
+}
+
+function normalizeArchivePronunciation(value) {
+  let raw = String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replaceAll('u:', 'v')
+    .replaceAll('ü', 'v')
+    .replace(/[’']/g, '')
+    .replace(/\s+/g, '')
+
+  if (!raw) return null
+
+  const numericMatches = raw.match(/[1-5]/g) ?? []
+  if (numericMatches.length === 1 && /[1-5]$/.test(raw)) {
+    return raw.replace(/[^a-zv1-5]/g, '')
+  }
+  if (numericMatches.length > 0) return null
+
+  let detectedTone = 5
+  let markedVowels = 0
+  let plain = ''
+
+  for (const character of raw) {
+    const marked = toneCharacterMap.get(character)
+    if (marked) {
+      markedVowels += 1
+      detectedTone = marked.tone
+      plain += marked.plain === 'ü' ? 'v' : marked.plain
+    } else if (/[a-zv]/.test(character)) {
+      plain += character
+    } else {
+      return null
+    }
+  }
+
+  if (markedVowels > 1 || !plain) return null
+  return `${plain}${detectedTone}`
 }
 
 function stripHtml(value) {
@@ -170,47 +244,13 @@ function buildCombos(matrix) {
           final,
           tone,
           base,
+          numeric: numericPinyin(base, tone),
           pinyin: applyToneMark(base, tone),
         })
       }
     }
   }
   return combos
-}
-
-async function discoverRecordings(combos) {
-  const resolved = new Map()
-  const patterns = [
-    (pinyin) => `File:Zh-${pinyin}.ogg`,
-    (pinyin) => `File:Zh-${pinyin}.oga`,
-    (pinyin) => `File:Cmn-${pinyin}.ogg`,
-    (pinyin) => `File:Cmn-${pinyin}.oga`,
-  ]
-
-  for (const pattern of patterns) {
-    const unresolved = combos.filter((combo) => !resolved.has(combo.key))
-    if (!unresolved.length) break
-
-    const titleToCombo = new Map(unresolved.map((combo) => [pattern(combo.pinyin), combo]))
-    const pages = await queryTitles([...titleToCombo.keys()])
-
-    for (const [title, combo] of titleToCombo) {
-      const page = pages.get(title)
-      if (!page || page.missing || !page.imageinfo?.[0]) continue
-
-      const imageInfo = page.imageinfo[0]
-      const metadata = imageInfo.extmetadata ?? {}
-      const speaker = resolveSpeaker(metadata)
-      if (!speaker) continue
-
-      const license = resolveLicense(metadata, speaker)
-      if (!license) continue
-
-      resolved.set(combo.key, { combo, page, imageInfo, metadata, speaker, license })
-    }
-  }
-
-  return [...resolved.values()]
 }
 
 async function exists(filePath) {
@@ -235,26 +275,24 @@ function retryDelayMilliseconds(response, attempt) {
   return Math.min(2_000 * 2 ** attempt, 60_000)
 }
 
-async function waitForAudioDownloadSlot() {
-  const earliestNextDownloadAt = lastAudioDownloadStartedAt + audioDownloadIntervalMilliseconds
-  const remainingDelay = earliestNextDownloadAt - Date.now()
-
-  if (remainingDelay > 0) {
-    await wait(remainingDelay)
-  }
-
-  lastAudioDownloadStartedAt = Date.now()
-}
-
-async function downloadAudio(url) {
+async function downloadWithRetry(url, destination, { throttle = false } = {}) {
   for (let attempt = 0; attempt < maximumDownloadAttempts; attempt += 1) {
-    await waitForAudioDownloadSlot()
-    const response = await fetch(url, { headers: { 'User-Agent': userAgent } })
-    if (response.ok) return response
+    if (throttle) {
+      const earliestNextDownloadAt = lastAudioDownloadStartedAt + audioDownloadIntervalMilliseconds
+      const remainingDelay = earliestNextDownloadAt - Date.now()
+      if (remainingDelay > 0) await wait(remainingDelay)
+      lastAudioDownloadStartedAt = Date.now()
+    }
 
-    const isTemporaryFailure = response.status === 429 || response.status >= 500
-    const hasMoreAttempts = attempt < maximumDownloadAttempts - 1
-    if (!isTemporaryFailure || !hasMoreAttempts) {
+    const response = await fetch(url, { headers: { 'User-Agent': userAgent } })
+    if (response.ok && response.body) {
+      await mkdir(path.dirname(destination), { recursive: true })
+      await pipeline(Readable.fromWeb(response.body), createWriteStream(destination))
+      return
+    }
+
+    const temporary = response.status === 429 || response.status >= 500
+    if (!temporary || attempt === maximumDownloadAttempts - 1) {
       throw new Error(`HTTP ${response.status} ao baixar ${url}`)
     }
 
@@ -262,11 +300,165 @@ async function downloadAudio(url) {
     console.warn(`HTTP ${response.status}; tentando novamente em ${Math.ceil(delay / 1000)}s.`)
     await wait(delay)
   }
-
-  throw new Error(`Não foi possível baixar ${url}`)
 }
 
-async function downloadRecording(recording) {
+async function findFileRecursive(directory, targetName) {
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const fullPath = path.join(directory, entry.name)
+    if (entry.isFile() && entry.name === targetName) return fullPath
+    if (entry.isDirectory()) {
+      const found = await findFileRecursive(fullPath, targetName)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function parseSwacIndex(text) {
+  const entries = []
+  let current = null
+
+  for (const rawLine of text.replace(/^\uFEFF/, '').split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#') || line.startsWith(';')) continue
+
+    const section = line.match(/^\[(.+)]$/)
+    if (section) {
+      if (current) entries.push(current)
+      current = { file: section[1] }
+      continue
+    }
+
+    if (!current) continue
+    const separator = line.indexOf('=')
+    if (separator < 0) continue
+    current[line.slice(0, separator).trim()] = line.slice(separator + 1).trim()
+  }
+
+  if (current) entries.push(current)
+  return entries
+}
+
+async function prepareArchive(collection) {
+  const archivePath = path.join(cacheRoot, `${collection.id}.tar.xz`)
+  const extractedPath = path.join(cacheRoot, collection.id)
+
+  if (force || !(await exists(archivePath))) {
+    console.log(`Baixando pacote completo ${collection.id}...`)
+    await downloadWithRetry(collection.archiveUrl, archivePath)
+  }
+
+  if (force) await rm(extractedPath, { recursive: true, force: true })
+  if (!(await exists(extractedPath))) {
+    console.log(`Extraindo ${collection.id}...`)
+    await mkdir(extractedPath, { recursive: true })
+    try {
+      await execFileAsync('tar', ['-xJf', archivePath, '-C', extractedPath])
+    } catch (error) {
+      throw new Error(`Falha ao extrair ${collection.id}. É necessário ter 'tar' com suporte a xz instalado. ${error.message}`)
+    }
+  }
+
+  return extractedPath
+}
+
+async function discoverArchiveSamples(combos) {
+  const comboByNumeric = new Map(combos.map((combo) => [combo.numeric, combo]))
+  const samplesByKey = new Map()
+
+  for (const collection of archiveCollections) {
+    try {
+      const extractedPath = await prepareArchive(collection)
+      const indexPath = await findFileRecursive(extractedPath, 'index.tags.txt')
+      if (!indexPath) throw new Error('index.tags.txt não encontrado no pacote')
+
+      const indexDirectory = path.dirname(indexPath)
+      const entries = parseSwacIndex(await readFile(indexPath, 'utf8'))
+      let accepted = 0
+
+      for (const entry of entries) {
+        const normalized = normalizeArchivePronunciation(entry.SWAC_PRON_PHON)
+        const combo = normalized ? comboByNumeric.get(normalized) : null
+        if (!combo || samplesByKey.has(combo.key)) continue
+
+        const sourceAudioPath = path.resolve(indexDirectory, entry.file)
+        if (!(await exists(sourceAudioPath))) continue
+
+        const fileName = `${combo.base.replaceAll('ü', 'v')}${combo.tone}.flac`
+        const destinationDirectory = path.join(audioRoot, collection.speaker.id)
+        const destinationPath = path.join(destinationDirectory, fileName)
+        await mkdir(destinationDirectory, { recursive: true })
+        if (force || !(await exists(destinationPath))) await copyFile(sourceAudioPath, destinationPath)
+
+        samplesByKey.set(combo.key, {
+          key: combo.key,
+          pinyin: combo.pinyin,
+          ...(entry.SWAC_TEXT ? { hanzi: entry.SWAC_TEXT } : {}),
+          initial: combo.initial,
+          final: combo.final,
+          tone: combo.tone,
+          audioUrl: `/audio/shtooka/${collection.speaker.id}/${fileName}`,
+          originalAudioUrl: collection.archiveUrl,
+          sourcePage: collection.sourcePage,
+          speakerId: collection.speaker.id,
+          speaker: collection.speaker.name,
+          speakerOrigin: collection.speaker.origin,
+          source: collection.source,
+          credits: collection.speaker.credits,
+          license: collection.speaker.defaultLicense,
+          localFile: true,
+          verifiedHuman: true,
+        })
+        accepted += 1
+      }
+
+      console.log(`${collection.id}: ${accepted} sílabas isoladas aproveitadas do pacote completo.`)
+    } catch (error) {
+      console.warn(`Não foi possível usar o pacote ${collection.id}: ${error.message}`)
+    }
+  }
+
+  return samplesByKey
+}
+
+async function discoverCommonsRecordings(combos, alreadyResolved) {
+  const resolved = new Map()
+  const patterns = [
+    (pinyin) => `File:Zh-${pinyin}.ogg`,
+    (pinyin) => `File:Zh-${pinyin}.oga`,
+    (pinyin) => `File:Cmn-${pinyin}.ogg`,
+    (pinyin) => `File:Cmn-${pinyin}.oga`,
+  ]
+
+  for (const pattern of patterns) {
+    const unresolved = combos.filter(
+      (combo) => !alreadyResolved.has(combo.key) && !resolved.has(combo.key),
+    )
+    if (!unresolved.length) break
+
+    const titleToCombo = new Map(unresolved.map((combo) => [pattern(combo.pinyin), combo]))
+    const pages = await queryTitles([...titleToCombo.keys()])
+
+    for (const [title, combo] of titleToCombo) {
+      const page = pages.get(title)
+      if (!page || page.missing || !page.imageinfo?.[0]) continue
+
+      const imageInfo = page.imageinfo[0]
+      const metadata = imageInfo.extmetadata ?? {}
+      const speaker = resolveSpeaker(metadata)
+      if (!speaker) continue
+
+      const license = resolveLicense(metadata, speaker)
+      if (!license) continue
+
+      resolved.set(combo.key, { combo, page, imageInfo, metadata, speaker, license })
+    }
+  }
+
+  return [...resolved.values()]
+}
+
+async function downloadCommonsRecording(recording) {
   const { combo, page, imageInfo, metadata, speaker, license } = recording
   const extension = path.extname(new URL(imageInfo.url).pathname) || '.ogg'
   const fileName = `${combo.base.replaceAll('ü', 'v')}${combo.tone}${extension}`
@@ -274,10 +466,8 @@ async function downloadRecording(recording) {
   const filePath = path.join(speakerDirectory, fileName)
 
   await mkdir(speakerDirectory, { recursive: true })
-
   if (force || !(await exists(filePath))) {
-    const response = await downloadAudio(imageInfo.url)
-    await writeFile(filePath, Buffer.from(await response.arrayBuffer()))
+    await downloadWithRetry(imageInfo.url, filePath, { throttle: true })
   }
 
   return {
@@ -320,14 +510,27 @@ async function mapWithConcurrency(items, concurrency, worker) {
 async function main() {
   const matrix = JSON.parse(await readFile(matrixPath, 'utf8'))
   const combos = buildCombos(matrix)
-
-  console.log(`Consultando ${combos.length} combinações de sílaba/tom no Wikimedia Commons...`)
-  const recordings = await discoverRecordings(combos)
-  console.log(`${recordings.length} gravações Shtooka humanas verificáveis encontradas.`)
-
   await mkdir(audioRoot, { recursive: true })
-  const samples = await mapWithConcurrency(recordings, audioDownloadConcurrency, downloadRecording)
-  samples.sort((a, b) => a.key.localeCompare(b.key))
+  await mkdir(cacheRoot, { recursive: true })
+
+  console.log(`Analisando ${combos.length} combinações da matriz de Pinyin...`)
+  const samplesByKey = await discoverArchiveSamples(combos)
+
+  console.log(`Pacotes completos cobriram ${samplesByKey.size} combinações. Consultando o Commons apenas para lacunas...`)
+  const commonsRecordings = await discoverCommonsRecordings(combos, samplesByKey)
+  const commonsSamples = await mapWithConcurrency(
+    commonsRecordings,
+    audioDownloadConcurrency,
+    downloadCommonsRecording,
+  )
+
+  for (const sample of commonsSamples) {
+    if (!samplesByKey.has(sample.key)) samplesByKey.set(sample.key, sample)
+  }
+
+  const samples = [...samplesByKey.values()].sort((a, b) => a.key.localeCompare(b.key))
+  const missing = combos.length - samples.length
+  const coverage = ((samples.length / combos.length) * 100).toFixed(1)
 
   const generatedSource = `import type { HumanAudioSample } from '../types/audio'\n\nexport const generatedAudioSamples: HumanAudioSample[] = ${JSON.stringify(samples, null, 2)}\n`
   await writeFile(generatedCatalogPath, generatedSource)
@@ -338,6 +541,9 @@ async function main() {
     console.log(`${speaker}: ${entries?.length ?? 0} arquivos`)
   }
 
+  console.log(`Cobertura: ${samples.length}/${combos.length} (${coverage}%).`)
+  console.log(`${missing} combinações da matriz continuam sem gravação isolada.`)
+  console.log('Observação: nem toda combinação teórica de sílaba + tom corresponde a uma palavra real do mandarim.')
   console.log(`Catálogo gravado em ${path.relative(root, generatedCatalogPath)}.`)
   console.log(`Áudios gravados em ${path.relative(root, audioRoot)}/.`)
 }
