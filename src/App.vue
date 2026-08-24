@@ -6,6 +6,8 @@ import { playHumanAudio } from './services/audioPlayer'
 import { buildToneMarkedPinyin } from './utils/pinyin'
 import type { HumanAudioSample, MandarinTone } from './types/audio'
 
+type FlashcardSide = 'left' | 'right'
+
 const toneLabels: Record<MandarinTone, string> = {
   1: '1º tom',
   2: '2º tom',
@@ -63,6 +65,58 @@ const visibleSamples = computed<HumanAudioSample[]>(() =>
   ),
 )
 
+const flashcardTarget = ref<FlashcardSide>('left')
+const flashcardChoiceOrder = ref<FlashcardSide[]>(['left', 'right'])
+const flashcardAnswer = ref<FlashcardSide | null>(null)
+const flashcardHasPlayed = ref(false)
+const flashcardLoading = ref(false)
+const flashcardCorrect = ref(0)
+const flashcardTotal = ref(0)
+
+const flashcardReady = computed(() =>
+  initialA.value !== initialB.value && Boolean(leftSample.value && rightSample.value),
+)
+
+const flashcardTargetSample = computed(() =>
+  flashcardTarget.value === 'left' ? leftSample.value : rightSample.value,
+)
+
+const flashcardTargetPinyin = computed(() =>
+  flashcardTarget.value === 'left' ? leftPinyin.value : rightPinyin.value,
+)
+
+const flashcardResultCorrect = computed(() =>
+  flashcardAnswer.value !== null && flashcardAnswer.value === flashcardTarget.value,
+)
+
+const flashcardChoices = computed(() =>
+  flashcardChoiceOrder.value.map((side) => ({
+    side,
+    label: side === 'left' ? 'Inicial A' : 'Inicial B',
+    initial: side === 'left' ? initialA.value : initialB.value,
+  })),
+)
+
+function randomBoolean(): boolean {
+  const values = new Uint32Array(1)
+  globalThis.crypto.getRandomValues(values)
+  return (values[0] & 1) === 1
+}
+
+function newFlashcardRound(): void {
+  flashcardTarget.value = randomBoolean() ? 'left' : 'right'
+  flashcardChoiceOrder.value = randomBoolean() ? ['left', 'right'] : ['right', 'left']
+  flashcardAnswer.value = null
+  flashcardHasPlayed.value = false
+  audioError.value = ''
+}
+
+watch(
+  [initialA, initialB, selectedFinal, selectedTone, leftSample, rightSample],
+  () => newFlashcardRound(),
+  { immediate: true, flush: 'post' },
+)
+
 async function listen(sample: HumanAudioSample | undefined, side: 'left' | 'right'): Promise<void> {
   if (!sample) return
 
@@ -75,6 +129,33 @@ async function listen(sample: HumanAudioSample | undefined, side: 'left' | 'righ
     audioError.value = 'Não foi possível reproduzir esta gravação humana.'
   } finally {
     loadingSide.value = null
+  }
+}
+
+async function playFlashcard(): Promise<void> {
+  if (!flashcardReady.value || !flashcardTargetSample.value) return
+
+  audioError.value = ''
+  flashcardLoading.value = true
+
+  try {
+    await playHumanAudio(flashcardTargetSample.value)
+    flashcardHasPlayed.value = true
+  } catch {
+    audioError.value = 'Não foi possível reproduzir o áudio desta rodada.'
+  } finally {
+    flashcardLoading.value = false
+  }
+}
+
+function answerFlashcard(side: FlashcardSide): void {
+  if (!flashcardReady.value || !flashcardHasPlayed.value || flashcardAnswer.value) return
+
+  flashcardAnswer.value = side
+  flashcardTotal.value += 1
+
+  if (side === flashcardTarget.value) {
+    flashcardCorrect.value += 1
   }
 }
 </script>
@@ -174,6 +255,67 @@ async function listen(sample: HumanAudioSample | undefined, side: 'left' | 'righ
           ? `Comparação ideal: as duas gravações são de ${leftSample.speaker}.`
           : `Atenção: os áudios disponíveis são de falantes diferentes (${leftSample.speaker} e ${rightSample.speaker}).` }}
       </p>
+
+      <section class="flashcard-section" aria-labelledby="flashcard-title">
+        <div class="flashcard-heading">
+          <div>
+            <p class="eyebrow">Teste</p>
+            <h2 id="flashcard-title">Flashcard auditivo</h2>
+            <p>Ouça sem olhar a resposta e identifique se a gravação usa a Inicial A ou a Inicial B.</p>
+          </div>
+          <div class="flashcard-score" aria-label="Pontuação da sessão">
+            <strong>{{ flashcardCorrect }}</strong>
+            <span>acertos em {{ flashcardTotal }}</span>
+          </div>
+        </div>
+
+        <p v-if="initialA === initialB" class="selection-notice">
+          Escolha iniciais diferentes para iniciar o teste.
+        </p>
+
+        <p v-else-if="!leftSample || !rightSample" class="selection-notice">
+          O flashcard precisa de uma gravação humana catalogada para os dois lados desta combinação.
+        </p>
+
+        <div v-else class="flashcard-card">
+          <span class="flashcard-round-label">Qual inicial você ouviu?</span>
+
+          <button class="flashcard-player" type="button" @click="playFlashcard">
+            {{ flashcardLoading ? 'Carregando…' : flashcardHasPlayed ? '▶ Ouvir novamente' : '▶ Ouvir áudio' }}
+          </button>
+
+          <p v-if="!flashcardHasPlayed" class="flashcard-hint">
+            Reproduza o áudio antes de responder.
+          </p>
+
+          <div class="flashcard-choices">
+            <button
+              v-for="choice in flashcardChoices"
+              :key="choice.side"
+              type="button"
+              :disabled="!flashcardHasPlayed || flashcardAnswer !== null"
+              :class="{
+                selected: flashcardAnswer === choice.side,
+                correct: flashcardAnswer !== null && flashcardTarget === choice.side,
+                wrong: flashcardAnswer === choice.side && flashcardTarget !== choice.side,
+              }"
+              @click="answerFlashcard(choice.side)"
+            >
+              <span>{{ choice.label }}</span>
+              <strong>{{ choice.initial || '∅' }}</strong>
+            </button>
+          </div>
+
+          <div v-if="flashcardAnswer" class="flashcard-result" :class="{ correct: flashcardResultCorrect, wrong: !flashcardResultCorrect }" role="status">
+            <strong>{{ flashcardResultCorrect ? 'Correto.' : 'Incorreto.' }}</strong>
+            <span>
+              O áudio era <b>{{ flashcardTarget === 'left' ? 'Inicial A' : 'Inicial B' }}</b>:
+              {{ flashcardTargetPinyin }}.
+            </span>
+            <button type="button" @click="newFlashcardRound">Próxima rodada</button>
+          </div>
+        </div>
+      </section>
 
       <p v-if="audioError" class="audio-error" role="alert">{{ audioError }}</p>
 
