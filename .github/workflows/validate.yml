@@ -21,8 +21,13 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Check audio sync script
-        run: node --check scripts/sync-human-audio.mjs
+      - name: Check audio sync scripts
+        run: |
+          node --check scripts/sync-human-audio.mjs
+          node --check scripts/sync-web-audio-catalog.mjs
+
+      - name: Generate human web audio catalog
+        run: npm run audio:web-catalog
 
       - name: Typecheck
         run: npm run typecheck

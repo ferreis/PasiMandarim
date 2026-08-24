@@ -11,6 +11,7 @@
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc -b",
+    "audio:web-catalog": "node scripts/sync-web-audio-catalog.mjs",
     "audio:sync": "node scripts/sync-human-audio.mjs",
     "audio:sync:force": "node scripts/sync-human-audio.mjs --force"
   },

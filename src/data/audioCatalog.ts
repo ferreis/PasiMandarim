@@ -1,4 +1,4 @@
-import { generatedAudioSamples } from './generatedAudioCatalog'
+import { webAudioSamples } from './webAudioCatalog'
 import type { HumanAudioSample, MandarinTone } from '../types/audio'
 
 const ccBy20Fr = {
@@ -49,8 +49,10 @@ const curatedRemoteSamples: HumanAudioSample[] = [
 
 const sampleMap = new Map<string, HumanAudioSample>()
 
+// Os poucos pares curados do Commons funcionam como fallback. O catálogo web
+// de Chen Wang é aplicado por último para priorizar o mesmo falante em todo o treino.
 for (const sample of curatedRemoteSamples) sampleMap.set(sample.key, sample)
-for (const sample of generatedAudioSamples) sampleMap.set(sample.key, sample)
+for (const sample of webAudioSamples) sampleMap.set(sample.key, sample)
 
 export const humanAudioSamples = [...sampleMap.values()]
 
