@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { findHumanAudioSample, humanAudioSamples, samplesUseSameSpeaker } from './data/audioCatalog'
+import {
+  findHumanAudioSample,
+  getAvailableTonesForPair,
+  getPlayableFinalsForPair,
+  humanAudioSamples,
+  samplesUseSameSpeaker,
+} from './data/audioCatalog'
 import { getCommonFinals, pinyinInitials } from './data/pinyinMatrix'
 import { playHumanAudio } from './services/audioPlayer'
 import { buildToneMarkedPinyin } from './utils/pinyin'
@@ -16,7 +22,6 @@ const toneLabels: Record<MandarinTone, string> = {
   5: 'Tom neutro',
 }
 
-const tones: MandarinTone[] = [1, 2, 3, 4, 5]
 const initialA = ref('b')
 const initialB = ref('p')
 const selectedFinal = ref('ian')
@@ -24,14 +29,37 @@ const selectedTone = ref<MandarinTone>(1)
 const audioError = ref('')
 const loadingSide = ref<'left' | 'right' | null>(null)
 
-const finalOptions = computed(() => getCommonFinals(initialA.value, initialB.value))
+const theoreticalCombinationCount = pinyinInitials.reduce(
+  (total, initial) => total + initial.finals.length * 5,
+  0,
+)
+const catalogCoverage = Math.round((humanAudioSamples.length / theoreticalCombinationCount) * 100)
+const localAudioCount = computed(() => humanAudioSamples.filter((sample) => sample.localFile).length)
 
-watch([initialA, initialB], () => {
+const commonFinalOptions = computed(() => getCommonFinals(initialA.value, initialB.value))
+const finalOptions = computed(() =>
+  getPlayableFinalsForPair(initialA.value, initialB.value, commonFinalOptions.value),
+)
+const toneOptions = computed(() =>
+  selectedFinal.value
+    ? getAvailableTonesForPair(initialA.value, initialB.value, selectedFinal.value)
+    : [],
+)
+
+function normalizeSelection(): void {
   if (!finalOptions.value.includes(selectedFinal.value)) {
     selectedFinal.value = finalOptions.value[0] ?? ''
   }
+
+  if (!toneOptions.value.includes(selectedTone.value)) {
+    selectedTone.value = toneOptions.value[0] ?? 1
+  }
+
   audioError.value = ''
-})
+}
+
+watch([initialA, initialB], normalizeSelection, { flush: 'sync' })
+watch(selectedFinal, normalizeSelection, { flush: 'sync' })
 
 const leftPinyin = computed(() =>
   selectedFinal.value
@@ -58,7 +86,6 @@ const rightSample = computed(() =>
 )
 
 const sameSpeaker = computed(() => samplesUseSameSpeaker(leftSample.value, rightSample.value))
-const localAudioCount = computed(() => humanAudioSamples.filter((sample) => sample.localFile).length)
 const visibleSamples = computed<HumanAudioSample[]>(() =>
   [leftSample.value, rightSample.value].filter(
     (sample): sample is HumanAudioSample => Boolean(sample),
@@ -166,14 +193,16 @@ function answerFlashcard(side: FlashcardSide): void {
       <p class="eyebrow">Learning Mandarin</p>
       <h1>Treino auditivo de Pinyin</h1>
       <p class="hero-copy">
-        Escolha duas iniciais, uma final válida para ambas e o mesmo tom. O sistema compara apenas sílabas possíveis no mandarim.
+        Escolha duas iniciais. As finais e os tons disponíveis são filtrados para mostrar apenas comparações que possuem gravação humana nos dois lados.
       </p>
     </section>
 
     <section class="trainer-card">
       <div class="catalog-status" role="status">
         <strong>{{ humanAudioSamples.length }} gravações humanas catalogadas</strong>
-        <span>{{ localAudioCount }} baixadas localmente. Nenhum TTS é usado como referência.</span>
+        <span>
+          {{ localAudioCount }} locais · cobertura atual de {{ catalogCoverage }}% da matriz teórica de sílaba/tom.
+        </span>
       </div>
 
       <div class="controls-grid">
@@ -196,7 +225,7 @@ function answerFlashcard(side: FlashcardSide): void {
         </label>
 
         <label>
-          <span class="field-label">Final comum</span>
+          <span class="field-label">Final com áudio nos dois lados</span>
           <select v-model="selectedFinal" :disabled="!finalOptions.length">
             <option v-for="final in finalOptions" :key="final" :value="final">
               {{ final }}
@@ -205,32 +234,35 @@ function answerFlashcard(side: FlashcardSide): void {
         </label>
 
         <label>
-          <span class="field-label">Tom</span>
-          <select v-model.number="selectedTone">
-            <option v-for="tone in tones" :key="tone" :value="tone">
+          <span class="field-label">Tom disponível</span>
+          <select v-model.number="selectedTone" :disabled="!toneOptions.length">
+            <option v-for="tone in toneOptions" :key="tone" :value="tone">
               {{ toneLabels[tone] }}
             </option>
           </select>
         </label>
       </div>
 
-      <p v-if="!finalOptions.length" class="selection-notice">
-        Essas duas iniciais não compartilham nenhuma final válida. Escolha outra combinação.
+      <p v-if="!commonFinalOptions.length" class="selection-notice">
+        Essas duas iniciais não compartilham nenhuma final válida no Pinyin.
       </p>
 
-      <div v-else class="comparison">
+      <p v-else-if="!finalOptions.length" class="selection-notice">
+        Essas iniciais compartilham finais válidas, mas ainda não existe um mesmo tom com gravação humana catalogada para os dois lados.
+      </p>
+
+      <div v-else-if="leftSample && rightSample" class="comparison">
         <article class="sound-card">
           <span class="sound-label">Som A</span>
           <strong>{{ leftPinyin }}</strong>
-          <span v-if="leftSample?.hanzi" class="hanzi">{{ leftSample.hanzi }}</span>
-          <button type="button" :disabled="!leftSample" @click="listen(leftSample, 'left')">
-            {{ loadingSide === 'left' ? 'Carregando…' : leftSample ? 'Ouvir' : 'Sem áudio' }}
+          <span v-if="leftSample.hanzi" class="hanzi">{{ leftSample.hanzi }}</span>
+          <button type="button" @click="listen(leftSample, 'left')">
+            {{ loadingSide === 'left' ? 'Carregando…' : 'Ouvir' }}
           </button>
-          <span v-if="leftSample" class="sample-origin">
+          <span class="sample-origin">
             {{ leftSample.speaker }} · {{ leftSample.localFile ? 'arquivo local' : 'Wikimedia' }}
           </span>
-          <span v-else class="sample-origin missing">Gravação humana ainda não catalogada</span>
-          <a v-if="leftSample" :href="leftSample.sourcePage" target="_blank" rel="noreferrer">Ver fonte</a>
+          <a :href="leftSample.sourcePage" target="_blank" rel="noreferrer">Ver fonte</a>
         </article>
 
         <span class="versus">×</span>
@@ -238,15 +270,14 @@ function answerFlashcard(side: FlashcardSide): void {
         <article class="sound-card">
           <span class="sound-label">Som B</span>
           <strong>{{ rightPinyin }}</strong>
-          <span v-if="rightSample?.hanzi" class="hanzi">{{ rightSample.hanzi }}</span>
-          <button type="button" :disabled="!rightSample" @click="listen(rightSample, 'right')">
-            {{ loadingSide === 'right' ? 'Carregando…' : rightSample ? 'Ouvir' : 'Sem áudio' }}
+          <span v-if="rightSample.hanzi" class="hanzi">{{ rightSample.hanzi }}</span>
+          <button type="button" @click="listen(rightSample, 'right')">
+            {{ loadingSide === 'right' ? 'Carregando…' : 'Ouvir' }}
           </button>
-          <span v-if="rightSample" class="sample-origin">
+          <span class="sample-origin">
             {{ rightSample.speaker }} · {{ rightSample.localFile ? 'arquivo local' : 'Wikimedia' }}
           </span>
-          <span v-else class="sample-origin missing">Gravação humana ainda não catalogada</span>
-          <a v-if="rightSample" :href="rightSample.sourcePage" target="_blank" rel="noreferrer">Ver fonte</a>
+          <a :href="rightSample.sourcePage" target="_blank" rel="noreferrer">Ver fonte</a>
         </article>
       </div>
 
@@ -273,8 +304,8 @@ function answerFlashcard(side: FlashcardSide): void {
           Escolha iniciais diferentes para iniciar o teste.
         </p>
 
-        <p v-else-if="!leftSample || !rightSample" class="selection-notice">
-          O flashcard precisa de uma gravação humana catalogada para os dois lados desta combinação.
+        <p v-else-if="!flashcardReady" class="selection-notice">
+          Não há uma comparação com áudio humano disponível para esta seleção.
         </p>
 
         <div v-else class="flashcard-card">
@@ -338,7 +369,7 @@ function answerFlashcard(side: FlashcardSide): void {
       </section>
 
       <p class="audio-notice">
-        Execute <code>npm run audio:sync</code> para pesquisar o acervo Shtooka no Wikimedia Commons, validar os metadados e baixar diretamente todas as gravações humanas encontradas para <code>public/audio/shtooka</code>.
+        O sincronizador usa coleções humanas Shtooka/SWAC e o Wikimedia Commons. Nem toda combinação teórica de sílaba + tom corresponde a uma palavra real do mandarim; por isso a interface só oferece pares que têm gravações humanas nos dois lados.
       </p>
     </section>
   </main>
