@@ -57,6 +57,11 @@ const rightSample = computed(() =>
 
 const sameSpeaker = computed(() => samplesUseSameSpeaker(leftSample.value, rightSample.value))
 const localAudioCount = computed(() => humanAudioSamples.filter((sample) => sample.localFile).length)
+const visibleSamples = computed<HumanAudioSample[]>(() =>
+  [leftSample.value, rightSample.value].filter(
+    (sample): sample is HumanAudioSample => Boolean(sample),
+  ),
+)
 
 async function listen(sample: HumanAudioSample | undefined, side: 'left' | 'right'): Promise<void> {
   if (!sample) return
@@ -172,18 +177,18 @@ async function listen(sample: HumanAudioSample | undefined, side: 'left' | 'righ
 
       <p v-if="audioError" class="audio-error" role="alert">{{ audioError }}</p>
 
-      <section v-if="leftSample || rightSample" class="audio-metadata" aria-label="Origem das gravações">
+      <section v-if="visibleSamples.length" class="audio-metadata" aria-label="Origem das gravações">
         <div class="verified-badge">Gravações humanas verificadas</div>
         <div class="metadata-columns">
-          <article v-for="sample in [leftSample, rightSample].filter(Boolean)" :key="sample!.key">
-            <strong>{{ sample!.pinyin }}</strong>
+          <article v-for="sample in visibleSamples" :key="sample.key">
+            <strong>{{ sample.pinyin }}</strong>
             <dl>
-              <div><dt>Falante</dt><dd>{{ sample!.speaker }}</dd></div>
-              <div><dt>Origem</dt><dd>{{ sample!.speakerOrigin }}</dd></div>
-              <div><dt>Créditos</dt><dd>{{ sample!.credits }}</dd></div>
+              <div><dt>Falante</dt><dd>{{ sample.speaker }}</dd></div>
+              <div><dt>Origem</dt><dd>{{ sample.speakerOrigin }}</dd></div>
+              <div><dt>Créditos</dt><dd>{{ sample.credits }}</dd></div>
               <div>
                 <dt>Licença</dt>
-                <dd><a :href="sample!.license.url" target="_blank" rel="noreferrer">{{ sample!.license.name }}</a></dd>
+                <dd><a :href="sample.license.url" target="_blank" rel="noreferrer">{{ sample.license.name }}</a></dd>
               </div>
             </dl>
           </article>
