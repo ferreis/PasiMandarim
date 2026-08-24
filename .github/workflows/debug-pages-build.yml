@@ -1,0 +1,55 @@
+name: Debug Pages build
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Restore Shtooka cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/shtooka
+          key: shtooka-v1-debug
+
+      - name: Synchronize human audio
+        run: npm run audio:sync
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build static site
+        run: npm run build
+
+      - name: Inspect build
+        run: |
+          echo "Dist size:"
+          du -sh dist
+          echo "Audio files:"
+          find dist/audio -type f | wc -l
+          echo "Index:"
+          test -f dist/index.html
+
+      - name: Upload debug artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-debug-dist
+          path: dist
+          retention-days: 1
