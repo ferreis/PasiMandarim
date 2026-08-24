@@ -20,7 +20,7 @@
     "vue": "latest"
   },
   "devDependencies": {
-    "typescript": "latest",
-    "vue-tsc": "latest"
+    "typescript": "6.0.2",
+    "vue-tsc": "3.3.11"
   }
 }
