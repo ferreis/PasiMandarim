@@ -66,6 +66,24 @@ export function findHumanAudioSample(
   return sampleMap.get(audioSampleKey(initial, final, tone))
 }
 
+export function getAvailableTonesForPair(
+  initialA: string,
+  initialB: string,
+  final: string,
+): MandarinTone[] {
+  return ([1, 2, 3, 4, 5] as MandarinTone[]).filter(
+    (tone) => findHumanAudioSample(initialA, final, tone) && findHumanAudioSample(initialB, final, tone),
+  )
+}
+
+export function getPlayableFinalsForPair(
+  initialA: string,
+  initialB: string,
+  commonFinals: string[],
+): string[] {
+  return commonFinals.filter((final) => getAvailableTonesForPair(initialA, initialB, final).length > 0)
+}
+
 export function samplesUseSameSpeaker(
   left?: HumanAudioSample,
   right?: HumanAudioSample,
