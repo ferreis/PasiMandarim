@@ -149,6 +149,149 @@ select {
 .audio-error { color: #8a1f17; background: #fff3f1; }
 .speaker-status.preferred { color: #185c37; background: #eef8f2; }
 
+.flashcard-section {
+  margin-top: 36px;
+  padding-top: 32px;
+  border-top: 1px solid #d9e0e7;
+}
+
+.flashcard-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.flashcard-heading h2 {
+  margin: 0;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+}
+
+.flashcard-heading p:not(.eyebrow) {
+  max-width: 650px;
+  margin: 10px 0 0;
+  color: #52606d;
+  line-height: 1.6;
+}
+
+.flashcard-score {
+  display: grid;
+  min-width: 120px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: #f7f9fb;
+  text-align: center;
+}
+
+.flashcard-score strong {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.flashcard-score span {
+  margin-top: 6px;
+  color: #687784;
+  font-size: 0.8rem;
+}
+
+.flashcard-card {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  margin-top: 24px;
+  padding: 28px;
+  border: 1px solid #e3e8ee;
+  border-radius: 18px;
+  background: #f7f9fb;
+}
+
+.flashcard-round-label {
+  color: #52606d;
+  font-weight: 800;
+}
+
+.flashcard-player {
+  min-width: 190px;
+  padding: 14px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: #17202a;
+  color: #fff;
+  font-weight: 800;
+}
+
+.flashcard-hint {
+  margin: -4px 0 0;
+  color: #687784;
+  font-size: 0.88rem;
+}
+
+.flashcard-choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 14px;
+  width: min(560px, 100%);
+}
+
+.flashcard-choices button {
+  display: grid;
+  gap: 4px;
+  padding: 18px;
+  border: 1px solid #cfd8e3;
+  border-radius: 14px;
+  background: #fff;
+  color: #17202a;
+}
+
+.flashcard-choices button span {
+  color: #687784;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.flashcard-choices button strong {
+  font-size: 1.8rem;
+}
+
+.flashcard-choices button.correct {
+  border-color: #2e7d4f;
+  background: #eef8f2;
+}
+
+.flashcard-choices button.wrong {
+  border-color: #b74337;
+  background: #fff3f1;
+}
+
+.flashcard-result {
+  display: grid;
+  gap: 8px;
+  width: min(560px, 100%);
+  padding: 16px;
+  border-radius: 14px;
+}
+
+.flashcard-result.correct {
+  background: #eef8f2;
+  color: #185c37;
+}
+
+.flashcard-result.wrong {
+  background: #fff3f1;
+  color: #8a1f17;
+}
+
+.flashcard-result button {
+  justify-self: start;
+  margin-top: 6px;
+  padding: 9px 14px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-weight: 700;
+}
+
 .audio-metadata {
   margin-top: 24px;
   padding: 20px;
@@ -199,9 +342,12 @@ dd { margin: 0; }
   .trainer-card { padding: 20px; }
   .comparison, .metadata-columns { grid-template-columns: 1fr; }
   .versus { text-align: center; }
+  .flashcard-heading { flex-direction: column; }
+  .flashcard-score { width: 100%; }
 }
 
 @media (max-width: 520px) {
-  .controls-grid { grid-template-columns: 1fr; }
+  .controls-grid, .flashcard-choices { grid-template-columns: 1fr; }
+  .flashcard-card { padding: 20px; }
   dl > div { grid-template-columns: 1fr; gap: 2px; }
 }
