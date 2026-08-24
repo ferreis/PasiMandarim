@@ -1,94 +1,108 @@
 # Learning Mandarin
 
-Treinador gratuito de pronúncia e percepção auditiva de mandarim, com foco em Pinyin, tons e contrastes fonéticos.
+Treinador gratuito e open source de percepção auditiva de mandarim, com foco em Pinyin, tons e contrastes fonéticos.
 
 ## Objetivo
 
-Treinar diferenças difíceis de perceber no Pinyin mantendo o máximo possível de variáveis constantes.
+O exercício mantém **final + tom** iguais e altera somente a inicial. Exemplo:
 
-Exemplo conceitual:
+- `biān` × `piān`
+- `dā` × `tā`
+- `gā` × `kā`
 
-- `bā` × `pā`
-- `bá` × `pá`
-- `bǎ` × `pǎ`
-- `bà` × `pà`
-
-A ideia é manter **final + tom** e alterar somente a **inicial**. O sistema não cria combinações artificiais apenas para preencher uma tabela: um exercício só é liberado quando existem gravações humanas compatíveis e verificadas para os dois lados.
+A interface permite escolher **Inicial A**, **Inicial B**, uma **Final comum válida** e o **Tom**. Combinações que não existem no mandarim não são oferecidas.
 
 ## Princípios
 
 - Interface em português do Brasil.
 - Gratuito e open source.
-- Sem dependência obrigatória de serviços pagos.
-- Áudio de referência gravado por falantes humanos reais.
-- Não usar TTS ou voz gerada por IA como referência de pronúncia.
-- Preferir comparações gravadas pelo mesmo falante.
-- Não misturar falantes em um par sem deixar isso explicitamente indicado.
-- Progresso salvo localmente no navegador.
+- Sem API paga.
+- Sem TTS ou voz gerada por IA como referência.
+- Somente gravações humanas com origem e licença verificáveis.
+- Preferência por comparar gravações do mesmo falante.
+- Áudios podem ser baixados e usados localmente.
 
-## Stack inicial
+## Stack
 
 - Vue 3
 - Vite
 - TypeScript
-- HTML Audio API / Web Audio API
-- `localStorage`
+- HTML Audio API
+- Node.js 22+ para sincronização do acervo
 
-O MVP não precisa de backend e pode ser hospedado gratuitamente como site estático.
+## Matriz de Pinyin
 
-## Contrastes iniciais
+A matriz compartilhada fica em `data/pinyin-matrix.json` e contém as combinações válidas de iniciais e finais usadas pelo frontend e pelo sincronizador de áudio.
 
-- `b × p`
-- `d × t`
-- `g × k`
-- `j × q`
-- `z × c`
-- `zh × ch`
+O sistema trata as regras ortográficas especiais do Pinyin. Exemplos:
 
-Depois serão adicionados contrastes de finais como `an × ang`, `en × eng` e `in × ing`.
+- sem inicial + `ian` → `yan`;
+- sem inicial + `u` → `wu`;
+- sem inicial + `ü` → `yu`;
+- `j` + `üe` → `jue`;
+- `q` + `üan` → `quan`.
 
-## Catálogo de áudio humano
+## Áudio humano
 
-O catálogo fica em `src/data/audioCatalog.ts`. Pares disponíveis para treino ficam em `verifiedAudioPairs`; achados que ainda precisam de validação ficam separados em `audioResearchCandidates` e não podem ser reproduzidos pelo treinador.
+O projeto prioriza dois acervos Shtooka disponíveis também no Wikimedia Commons:
 
-### Primeiro par verificado
+1. **Wei Gao** — falante de Pequim, gravações de 2006, créditos Wei Gao e Vion Nicolas, CC BY 2.0 FR.
+2. **Yue Tan** — falante de Liaoning, gravações de 2009, CC BY-SA 3.0 US.
 
-| Contraste | Final | Tom | Som A | Som B | Falante | Origem | Acervo | Licença |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `b × p` | `ian` | 1º | `biān` 边 | `piān` 篇 | Wei Gao | Pequim, China | Shtooka / Wikimedia Commons | CC BY 2.0 FR |
+O frontend nunca considera uma amostra válida apenas porque existe um arquivo com o nome esperado. O sincronizador verifica os metadados do Wikimedia Commons e só aceita arquivos associados ao Shtooka e a um falante humano conhecido.
 
-Os dois lados são gravações do mesmo falante. Os créditos indicados pelo Wikimedia Commons/Shtooka são Wei Gao e Vion Nicolas.
+### Baixar os áudios diretamente
 
-Fontes originais:
+```bash
+npm install
+npm run audio:sync
+```
 
-- `biān`: https://commons.wikimedia.org/wiki/File:Zh-bi%C4%81n.ogg
-- `piān`: https://commons.wikimedia.org/wiki/File:Zh-pi%C4%81n.ogg
-- licença: https://creativecommons.org/licenses/by/2.0/fr/
+O comando:
 
-### Candidatos ainda bloqueados
+1. lê todas as combinações válidas de `data/pinyin-matrix.json`;
+2. gera os cinco tons de cada sílaba;
+3. consulta o Wikimedia Commons em lotes;
+4. procura arquivos `Zh-*` e `Cmn-*` em OGG/OGA;
+5. verifica fonte, falante e licença;
+6. baixa as gravações aceitas para `public/audio/shtooka/`;
+7. gera `public/audio/shtooka/catalog.json`;
+8. reescreve `src/data/generatedAudioCatalog.ts` apontando para os arquivos locais.
 
-Os seguintes pares foram localizados no acervo, mas continuam fora dos exercícios até que os metadados dos dois arquivos sejam confirmados:
+Para baixar novamente arquivos já existentes:
 
-- `bǎo × pǎo` — final `ao`, 3º tom;
-- `biàn × piàn` — final `ian`, 4º tom;
-- `bái × pái` — final `ai`, 2º tom.
+```bash
+npm run audio:sync:force
+```
 
-## Regras para aceitar um áudio
+Depois da sincronização, o navegador reproduz os arquivos locais e não precisa consultar o Wikimedia para esses áudios.
 
-Cada amostra precisa registrar:
+## Estrutura
 
-- Pinyin e tom;
-- caractere usado na gravação;
-- inicial e final;
-- URL direta do áudio;
-- página original da fonte;
-- nome do falante;
-- região/origem do falante, quando informada;
-- acervo/projeto de origem;
-- créditos;
-- licença.
+```text
+data/
+└── pinyin-matrix.json
 
-Para um par ser marcado como `verified`, os dois áudios devem ter origem humana verificável. A preferência é sempre por **mesmo falante + mesma final + mesmo tom**.
+scripts/
+└── sync-human-audio.mjs
+
+public/
+└── audio/
+    └── shtooka/
+
+src/
+├── data/
+│   ├── audioCatalog.ts
+│   ├── generatedAudioCatalog.ts
+│   └── pinyinMatrix.ts
+├── services/
+│   └── audioPlayer.ts
+├── types/
+│   └── audio.ts
+├── utils/
+│   └── pinyin.ts
+└── App.vue
+```
 
 ## Desenvolvimento
 
@@ -97,20 +111,28 @@ npm install
 npm run dev
 ```
 
-Para validar os tipos e gerar a aplicação de produção:
+Validação:
 
 ```bash
 npm run typecheck
 npm run build
 ```
 
-## Roadmap
+## Política de catálogo
 
-1. Expandir o catálogo `b × p` mantendo o mesmo falante sempre que possível.
-2. Cobrir os quatro tons onde existirem sílabas e gravações adequadas.
-3. Modo de comparação A/B.
-4. Modo de identificação cega.
-5. Estatísticas locais de acerto por contraste.
-6. Expandir para `d/t`, `g/k`, `j/q`, `z/c` e `zh/ch`.
-7. Treino de finais.
-8. Gravação da voz do estudante para comparação acústica, sem síntese de voz.
+Cada gravação aceita registra:
+
+- Pinyin;
+- inicial;
+- final;
+- tom;
+- caractere, quando disponível nos metadados;
+- arquivo local;
+- URL original;
+- página original no Commons;
+- falante;
+- origem do falante;
+- créditos;
+- licença.
+
+Quando os dois lados de uma comparação possuem áudio, a interface informa se eles foram gravados pelo mesmo falante. Quando uma combinação ainda não possui gravação humana validada, o botão de áudio permanece desativado.

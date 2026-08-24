@@ -6,9 +6,7 @@
   text-rendering: optimizeLegibility;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
 body {
   margin: 0;
@@ -16,23 +14,11 @@ body {
   min-height: 100vh;
 }
 
-button,
-select {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-a {
-  color: inherit;
-}
+button, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: 0.5; }
+a { color: inherit; }
+code { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 
 .page-shell {
   width: min(1040px, calc(100% - 32px));
@@ -40,10 +26,7 @@ a {
   padding: 64px 0;
 }
 
-.hero {
-  margin-bottom: 32px;
-}
-
+.hero { margin-bottom: 32px; }
 .eyebrow {
   margin: 0 0 8px;
   font-size: 0.8rem;
@@ -59,7 +42,7 @@ h1 {
 }
 
 .hero-copy {
-  max-width: 680px;
+  max-width: 760px;
   margin: 16px 0 0;
   color: #52606d;
   font-size: 1.05rem;
@@ -70,32 +53,27 @@ h1 {
   padding: 28px;
   border: 1px solid #d9e0e7;
   border-radius: 20px;
-  background: #ffffff;
+  background: #fff;
   box-shadow: 0 18px 50px rgba(23, 32, 42, 0.08);
 }
 
 .catalog-status {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 28px;
+  gap: 8px 24px;
   padding: 14px 16px;
-  border: 1px solid #d7e4dc;
   border-radius: 12px;
-  background: #f6faf7;
-}
-
-.catalog-status span {
+  background: #f7f9fb;
   color: #52606d;
-  font-size: 0.9rem;
 }
 
-.field-group + .field-group,
-.controls-row,
-.comparison,
-.audio-notice,
-.audio-metadata {
+.catalog-status strong { color: #17202a; }
+
+.controls-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
   margin-top: 28px;
 }
 
@@ -107,44 +85,12 @@ h1 {
   color: #52606d;
 }
 
-.contrast-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.choice-button {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 16px;
-  border: 1px solid #cfd8e3;
-  border-radius: 14px;
-  background: #ffffff;
-  text-align: left;
-}
-
-.choice-button.active {
-  border-color: #17202a;
-  background: #f0f3f5;
-}
-
-.choice-button small {
-  color: #687784;
-}
-
-.controls-row {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
 select {
   width: 100%;
   padding: 12px 14px;
   border: 1px solid #cfd8e3;
   border-radius: 12px;
-  background: #ffffff;
+  background: #fff;
 }
 
 .comparison {
@@ -152,135 +98,110 @@ select {
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   gap: 18px;
+  margin-top: 28px;
 }
 
 .sound-card {
   display: grid;
   gap: 12px;
   justify-items: center;
-  padding: 32px 20px;
+  min-height: 310px;
+  padding: 30px 20px;
+  border: 1px solid #e3e8ee;
   border-radius: 18px;
   background: #f7f9fb;
+  text-align: center;
 }
 
-.sound-card strong {
-  font-size: clamp(2.5rem, 8vw, 4.8rem);
+.sound-card > strong {
+  font-size: clamp(2.6rem, 8vw, 4.8rem);
   line-height: 1;
 }
 
-.hanzi {
-  font-size: 1.75rem;
-}
-
 .sound-card button {
-  min-width: 120px;
-  padding: 10px 16px;
-  border: 1px solid #17202a;
+  min-width: 130px;
+  padding: 10px 18px;
+  border: 0;
   border-radius: 999px;
   background: #17202a;
-  color: #ffffff;
+  color: #fff;
 }
 
-.sound-card a {
-  color: #52606d;
-  font-size: 0.8rem;
-}
+.sound-card a { font-size: 0.85rem; }
+.sound-label, .sample-origin { color: #687784; font-weight: 700; }
+.sample-origin { font-size: 0.82rem; font-weight: 600; }
+.sample-origin.missing { font-weight: 500; }
+.hanzi { font-size: 1.4rem; color: #52606d; }
+.versus { font-size: 1.6rem; font-weight: 800; }
 
-.sound-label {
-  color: #687784;
-  font-weight: 700;
-}
-
-.versus {
-  font-size: 1.6rem;
-  font-weight: 800;
-}
-
-.audio-metadata {
-  padding: 18px;
-  border: 1px solid #d9e0e7;
-  border-radius: 14px;
-}
-
-.verified-badge {
-  display: inline-flex;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: #eef6f0;
-  font-size: 0.8rem;
-  font-weight: 700;
-}
-
-.audio-metadata dl {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 16px;
-  margin: 16px 0 0;
-}
-
-.audio-metadata dl > div {
-  min-width: 0;
-}
-
-.audio-metadata dt {
-  margin-bottom: 4px;
-  color: #687784;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.audio-metadata dd {
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
+.selection-notice,
 .audio-notice,
-.audio-error {
+.audio-error,
+.speaker-status {
+  margin: 20px 0 0;
   padding: 14px 16px;
   border-radius: 12px;
+  background: #f7f9fb;
+  color: #52606d;
   line-height: 1.5;
 }
 
-.audio-notice {
+.audio-error { color: #8a1f17; background: #fff3f1; }
+.speaker-status.preferred { color: #185c37; background: #eef8f2; }
+
+.audio-metadata {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #d9e0e7;
+  border-radius: 16px;
+}
+
+.verified-badge {
+  display: inline-block;
+  margin-bottom: 16px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef8f2;
+  color: #185c37;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.metadata-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.metadata-columns article {
+  padding: 16px;
+  border-radius: 12px;
   background: #f7f9fb;
-  color: #52606d;
 }
 
-.audio-error {
-  margin: 18px 0 0;
-  background: #fff2f2;
-  color: #8b2323;
+.metadata-columns article > strong { font-size: 1.3rem; }
+dl { margin: 12px 0 0; }
+dl > div {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 10px;
+  padding: 6px 0;
 }
+dt { color: #687784; font-weight: 700; }
+dd { margin: 0; }
 
-@media (max-width: 820px) {
-  .audio-metadata dl {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+@media (max-width: 840px) {
+  .controls-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 720px) {
-  .page-shell {
-    padding: 36px 0;
-  }
+  .page-shell { padding: 36px 0; }
+  .trainer-card { padding: 20px; }
+  .comparison, .metadata-columns { grid-template-columns: 1fr; }
+  .versus { text-align: center; }
+}
 
-  .trainer-card {
-    padding: 20px;
-  }
-
-  .catalog-status {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .contrast-grid,
-  .controls-row,
-  .comparison,
-  .audio-metadata dl {
-    grid-template-columns: 1fr;
-  }
-
-  .versus {
-    text-align: center;
-  }
+@media (max-width: 520px) {
+  .controls-grid { grid-template-columns: 1fr; }
+  dl > div { grid-template-columns: 1fr; gap: 2px; }
 }
