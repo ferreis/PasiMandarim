@@ -62,7 +62,6 @@ function candidateNames(base, tone) {
   const normalized = base.replaceAll('ü', 'v').toLowerCase()
   const candidates = [`cmn-${normalized}${tone}.mp3`]
 
-  // Alguns corpus escrevem ü explicitamente; mantemos a variante como fallback.
   if (base.includes('ü')) candidates.push(`cmn-${base.toLowerCase()}${tone}.mp3`)
   return candidates
 }
@@ -123,8 +122,8 @@ async function main() {
           source: 'audio-cmn / Shtooka',
           credits: 'Chen Wang e colaboradores do projeto audio-cmn',
           license: {
-            name: 'CC BY-SA',
-            url: 'https://creativecommons.org/licenses/by-sa/4.0/',
+            name: 'CC BY-SA (conforme acervo original)',
+            url: 'https://github.com/hugolpz/audio-cmn#readme',
           },
           localFile: false,
           verifiedHuman: true,
