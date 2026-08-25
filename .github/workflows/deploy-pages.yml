@@ -33,6 +33,9 @@ jobs:
       - name: Generate human web audio catalog
         run: npm run audio:web-catalog
 
+      - name: Generate radicals catalog
+        run: npm run radicals:sync
+
       - name: Typecheck
         run: npm run typecheck
 
