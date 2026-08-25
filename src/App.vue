@@ -4,11 +4,14 @@ import AppFooter from './components/AppFooter.vue'
 import AppHeader from './components/AppHeader.vue'
 import ComparisonTrainer from './components/ComparisonTrainer.vue'
 import FlashcardTrainer from './components/FlashcardTrainer.vue'
+import RadicalsExplorer from './components/RadicalsExplorer.vue'
 
-type AppTab = 'comparison' | 'flashcards'
+type AppTab = 'comparison' | 'flashcards' | 'radicals'
 
 function tabFromHash(): AppTab {
-  return window.location.hash === '#/flashcards' ? 'flashcards' : 'comparison'
+  if (window.location.hash === '#/flashcards') return 'flashcards'
+  if (window.location.hash === '#/radicals') return 'radicals'
+  return 'comparison'
 }
 
 const activeTab = ref<AppTab>(typeof window === 'undefined' ? 'comparison' : tabFromHash())
@@ -20,14 +23,23 @@ function syncTabWithHash(): void {
 onMounted(() => window.addEventListener('hashchange', syncTabWithHash))
 onBeforeUnmount(() => window.removeEventListener('hashchange', syncTabWithHash))
 
-const heroTitle = computed(() =>
-  activeTab.value === 'flashcards' ? 'Flashcards auditivos' : 'Treino auditivo de Pinyin',
-)
-const heroCopy = computed(() =>
-  activeTab.value === 'flashcards'
-    ? 'Escolha duas iniciais e a quantidade de questões. O sistema sorteia finais e tons com áudio humano, embaralha cada rodada e acompanha seu desempenho.'
-    : 'Compare duas iniciais mantendo final e tom iguais para perceber com clareza as diferenças de pronúncia.',
-)
+const heroTitle = computed(() => {
+  if (activeTab.value === 'flashcards') return 'Flashcards auditivos'
+  if (activeTab.value === 'radicals') return 'Radicais chineses'
+  return 'Treino auditivo de Pinyin'
+})
+
+const heroCopy = computed(() => {
+  if (activeTab.value === 'flashcards') {
+    return 'Escolha duas iniciais e a quantidade de questões. O sistema sorteia finais e tons com áudio humano, embaralha cada rodada e acompanha seu desempenho.'
+  }
+
+  if (activeTab.value === 'radicals') {
+    return 'Explore os 214 radicais Kangxi por símbolo, Pinyin, significado, número de traços, variantes e evidências históricas verificáveis.'
+  }
+
+  return 'Compare duas iniciais mantendo final e tom iguais para perceber com clareza as diferenças de pronúncia.'
+})
 </script>
 
 <template>
@@ -40,7 +52,8 @@ const heroCopy = computed(() =>
     </section>
 
     <ComparisonTrainer v-if="activeTab === 'comparison'" />
-    <FlashcardTrainer v-else />
+    <FlashcardTrainer v-else-if="activeTab === 'flashcards'" />
+    <RadicalsExplorer v-else />
   </main>
 
   <AppFooter />
