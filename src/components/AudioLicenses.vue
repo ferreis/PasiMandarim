@@ -40,3 +40,82 @@ const audioSources = [
     </div>
   </section>
 </template>
+
+<style scoped>
+.audio-license-footer {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.6fr);
+  gap: 32px;
+  padding: 30px 0;
+  border-bottom: 1px solid #d9e0e7;
+}
+
+.footer-section-heading h2 {
+  margin: 6px 0 0;
+  font-size: 1.25rem;
+}
+
+.footer-section-heading p {
+  margin: 10px 0 0;
+  color: #687784;
+  line-height: 1.6;
+}
+
+.footer-kicker {
+  color: #52606d;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.license-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.license-card {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 18px;
+  border: 1px solid #dfe5eb;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.license-card > strong {
+  color: #17202a;
+  font-size: 0.96rem;
+}
+
+.license-card > span {
+  color: #687784;
+  font-size: 0.84rem;
+}
+
+.license-card p {
+  margin: 2px 0;
+  color: #52606d;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.license-card a {
+  color: #17202a;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .audio-license-footer,
+  .license-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .audio-license-footer {
+    gap: 20px;
+  }
+}
+</style>
