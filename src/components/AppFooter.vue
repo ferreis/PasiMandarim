@@ -13,7 +13,7 @@ import AudioLicenses from './AudioLicenses.vue'
           <h2 id="project-footer-title">Learning Mandarin</h2>
           <p>
             Projeto de código aberto, gratuito e mantido sem fins lucrativos para apoiar o estudo
-            de pronúncia e percepção auditiva do mandarim.
+            de pronúncia, percepção auditiva e componentes da escrita chinesa.
           </p>
         </div>
 
@@ -22,6 +22,12 @@ import AudioLicenses from './AudioLicenses.vue'
             Criado por
             <a href="https://github.com/ferreis" target="_blank" rel="noreferrer">
               Rafael Fernando dos Reis Mecabô (@ferreis)
+            </a>
+          </span>
+          <span>
+            Dados estruturados dos radicais:
+            <a href="https://github.com/bluegreenstone/hanzi-project" target="_blank" rel="noreferrer">
+              Hanzi Project
             </a>
           </span>
           <a
@@ -81,7 +87,7 @@ import AudioLicenses from './AudioLicenses.vue'
 .project-footer-links {
   display: grid;
   justify-items: end;
-  gap: 12px;
+  gap: 9px;
   color: #52606d;
   font-size: 0.9rem;
   text-align: right;
@@ -96,6 +102,7 @@ import AudioLicenses from './AudioLicenses.vue'
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  margin-top: 3px;
   padding: 10px 15px;
   border: 1px solid #17202a;
   border-radius: 999px;
