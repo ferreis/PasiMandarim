@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AppFooter from './components/AppFooter.vue'
+import AppHeader from './components/AppHeader.vue'
 import ComparisonTrainer from './components/ComparisonTrainer.vue'
 import FlashcardTrainer from './components/FlashcardTrainer.vue'
 
@@ -31,16 +32,9 @@ const heroCopy = computed(() =>
 
 <template>
   <main class="page-shell">
-    <header class="app-header">
-      <a class="brand" href="#/comparison">Learning Mandarin</a>
-      <nav class="app-tabs" aria-label="Modos de treino">
-        <a href="#/comparison" :class="{ active: activeTab === 'comparison' }">Comparação</a>
-        <a href="#/flashcards" :class="{ active: activeTab === 'flashcards' }">Flashcards</a>
-      </nav>
-    </header>
+    <AppHeader :active-tab="activeTab" />
 
     <section class="hero">
-      <p class="eyebrow">Learning Mandarin</p>
       <h1>{{ heroTitle }}</h1>
       <p class="hero-copy">{{ heroCopy }}</p>
     </section>
