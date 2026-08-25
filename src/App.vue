@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import AppFooter from './components/AppFooter.vue'
 import ComparisonTrainer from './components/ComparisonTrainer.vue'
 import FlashcardTrainer from './components/FlashcardTrainer.vue'
 
@@ -47,4 +48,6 @@ const heroCopy = computed(() =>
     <ComparisonTrainer v-if="activeTab === 'comparison'" />
     <FlashcardTrainer v-else />
   </main>
+
+  <AppFooter />
 </template>
