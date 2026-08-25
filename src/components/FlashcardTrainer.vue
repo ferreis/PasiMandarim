@@ -1,0 +1,423 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import {
+  findHumanAudioSample,
+  getAvailableTonesForPair,
+  samplesUseSameSpeaker,
+} from '../data/audioCatalog'
+import { getCommonFinals, pinyinInitials } from '../data/pinyinMatrix'
+import { playHumanAudio } from '../services/audioPlayer'
+import {
+  buildInitialPairKey,
+  clearFlashcardAttemptsForPair,
+  loadFlashcardAttempts,
+  saveFlashcardAttempt,
+  type FlashcardAttempt,
+} from '../services/flashcardStats'
+import { buildToneMarkedPinyin } from '../utils/pinyin'
+import type { HumanAudioSample, MandarinTone } from '../types/audio'
+
+type FlashcardSide = 'a' | 'b'
+
+type FlashcardCandidate = {
+  final: string
+  tone: MandarinTone
+  sampleA: HumanAudioSample
+  sampleB: HumanAudioSample
+  sameSpeaker: boolean
+}
+
+type FlashcardQuestion = FlashcardCandidate & {
+  targetSide: FlashcardSide
+  answerOrder: FlashcardSide[]
+}
+
+type FinalErrorSummary = {
+  final: string
+  attempts: number
+  errors: number
+  errorRate: number
+}
+
+const initialA = ref('b')
+const initialB = ref('p')
+const requestedCards = ref(10)
+const attempts = ref<FlashcardAttempt[]>(loadFlashcardAttempts())
+
+const questions = ref<FlashcardQuestion[]>([])
+const currentIndex = ref(0)
+const answer = ref<FlashcardSide | null>(null)
+const hasPlayed = ref(false)
+const audioLoading = ref(false)
+const audioError = ref('')
+const sessionCorrect = ref(0)
+const sessionErrors = ref(0)
+const sessionActive = ref(false)
+const sessionFinished = ref(false)
+
+const quantityOptions = [5, 10, 20, 30, 50]
+
+function displayInitial(initial: string): string {
+  return initial || '∅'
+}
+
+function randomIndex(max: number): number {
+  if (max <= 1) return 0
+  const limit = Math.floor(0x100000000 / max) * max
+  const buffer = new Uint32Array(1)
+
+  do {
+    globalThis.crypto.getRandomValues(buffer)
+  } while (buffer[0] >= limit)
+
+  return buffer[0] % max
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const result = [...items]
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = randomIndex(index + 1)
+    ;[result[index], result[swapIndex]] = [result[swapIndex], result[index]]
+  }
+  return result
+}
+
+const allCandidates = computed<FlashcardCandidate[]>(() => {
+  if (initialA.value === initialB.value) return []
+
+  const candidates: FlashcardCandidate[] = []
+
+  for (const final of getCommonFinals(initialA.value, initialB.value)) {
+    for (const tone of getAvailableTonesForPair(initialA.value, initialB.value, final)) {
+      const sampleA = findHumanAudioSample(initialA.value, final, tone)
+      const sampleB = findHumanAudioSample(initialB.value, final, tone)
+      if (!sampleA || !sampleB) continue
+
+      candidates.push({
+        final,
+        tone,
+        sampleA,
+        sampleB,
+        sameSpeaker: samplesUseSameSpeaker(sampleA, sampleB),
+      })
+    }
+  }
+
+  return candidates
+})
+
+const candidates = computed(() => {
+  const sameSpeakerCandidates = allCandidates.value.filter((candidate) => candidate.sameSpeaker)
+  return sameSpeakerCandidates.length ? sameSpeakerCandidates : allCandidates.value
+})
+
+const usesSameSpeakerOnly = computed(() =>
+  candidates.value.length > 0 && candidates.value.every((candidate) => candidate.sameSpeaker),
+)
+
+function buildQuestionSet(count: number): FlashcardQuestion[] {
+  const pool: FlashcardQuestion[] = candidates.value.flatMap((candidate) => [
+    { ...candidate, targetSide: 'a' as const, answerOrder: shuffle<FlashcardSide>(['a', 'b']) },
+    { ...candidate, targetSide: 'b' as const, answerOrder: shuffle<FlashcardSide>(['a', 'b']) },
+  ])
+
+  if (!pool.length) return []
+
+  const result: FlashcardQuestion[] = []
+  while (result.length < count) {
+    const cycle = shuffle(pool).map((question) => ({
+      ...question,
+      answerOrder: shuffle<FlashcardSide>(['a', 'b']),
+    }))
+    result.push(...cycle.slice(0, count - result.length))
+  }
+
+  return result
+}
+
+const currentQuestion = computed(() => questions.value[currentIndex.value])
+const currentSample = computed(() => {
+  const question = currentQuestion.value
+  if (!question) return undefined
+  return question.targetSide === 'a' ? question.sampleA : question.sampleB
+})
+const currentTargetInitial = computed(() =>
+  currentQuestion.value?.targetSide === 'a' ? initialA.value : initialB.value,
+)
+const currentPinyin = computed(() => {
+  const question = currentQuestion.value
+  if (!question) return ''
+  return buildToneMarkedPinyin(currentTargetInitial.value, question.final, question.tone)
+})
+const answerIsCorrect = computed(() =>
+  Boolean(answer.value && currentQuestion.value && answer.value === currentQuestion.value.targetSide),
+)
+const answeredCount = computed(() => sessionCorrect.value + sessionErrors.value)
+const sessionAccuracy = computed(() =>
+  answeredCount.value ? Math.round((sessionCorrect.value / answeredCount.value) * 100) : 0,
+)
+
+const selectedPairKey = computed(() => buildInitialPairKey(initialA.value, initialB.value))
+const pairAttempts = computed(() =>
+  attempts.value.filter((attempt) => attempt.pairKey === selectedPairKey.value),
+)
+const historicalCorrect = computed(() => pairAttempts.value.filter((attempt) => attempt.correct).length)
+const historicalErrors = computed(() => pairAttempts.value.length - historicalCorrect.value)
+const historicalAccuracy = computed(() =>
+  pairAttempts.value.length
+    ? Math.round((historicalCorrect.value / pairAttempts.value.length) * 100)
+    : 0,
+)
+
+const worstFinals = computed<FinalErrorSummary[]>(() => {
+  const byFinal = new Map<string, { attempts: number; errors: number }>()
+
+  for (const attempt of pairAttempts.value) {
+    const summary = byFinal.get(attempt.final) ?? { attempts: 0, errors: 0 }
+    summary.attempts += 1
+    if (!attempt.correct) summary.errors += 1
+    byFinal.set(attempt.final, summary)
+  }
+
+  return [...byFinal.entries()]
+    .map(([final, summary]) => ({
+      final,
+      attempts: summary.attempts,
+      errors: summary.errors,
+      errorRate: summary.attempts ? Math.round((summary.errors / summary.attempts) * 100) : 0,
+    }))
+    .filter((summary) => summary.errors > 0)
+    .sort((left, right) =>
+      right.errors - left.errors || right.errorRate - left.errorRate || right.attempts - left.attempts,
+    )
+    .slice(0, 6)
+})
+
+function startSession(): void {
+  if (!candidates.value.length) return
+
+  questions.value = buildQuestionSet(requestedCards.value)
+  currentIndex.value = 0
+  answer.value = null
+  hasPlayed.value = false
+  audioError.value = ''
+  sessionCorrect.value = 0
+  sessionErrors.value = 0
+  sessionFinished.value = false
+  sessionActive.value = true
+}
+
+async function playCurrentAudio(): Promise<void> {
+  if (!currentSample.value) return
+
+  audioLoading.value = true
+  audioError.value = ''
+
+  try {
+    await playHumanAudio(currentSample.value)
+    hasPlayed.value = true
+  } catch {
+    audioError.value = 'Não foi possível reproduzir o áudio desta questão.'
+  } finally {
+    audioLoading.value = false
+  }
+}
+
+function answerQuestion(side: FlashcardSide): void {
+  const question = currentQuestion.value
+  if (!question || !hasPlayed.value || answer.value) return
+
+  answer.value = side
+  const correct = side === question.targetSide
+
+  if (correct) sessionCorrect.value += 1
+  else sessionErrors.value += 1
+
+  attempts.value = saveFlashcardAttempt({
+    initialA: initialA.value,
+    initialB: initialB.value,
+    final: question.final,
+    tone: question.tone,
+    targetInitial: currentTargetInitial.value,
+    correct,
+  })
+}
+
+function nextQuestion(): void {
+  if (!answer.value) return
+
+  if (currentIndex.value >= questions.value.length - 1) {
+    sessionFinished.value = true
+    sessionActive.value = false
+    return
+  }
+
+  currentIndex.value += 1
+  answer.value = null
+  hasPlayed.value = false
+  audioError.value = ''
+}
+
+function clearPairHistory(): void {
+  attempts.value = clearFlashcardAttemptsForPair(initialA.value, initialB.value)
+}
+</script>
+
+<template>
+  <section class="flashcards-layout">
+    <section class="trainer-card flashcard-main-panel">
+      <div class="flashcard-setup">
+        <div>
+          <p class="eyebrow">Configuração</p>
+          <h2>Monte sua sessão</h2>
+          <p>Escolha somente as duas iniciais e quantos flashcards quer responder. Finais e tons são sorteados automaticamente.</p>
+        </div>
+
+        <div class="flashcard-setup-grid">
+          <label>
+            <span class="field-label">Inicial A</span>
+            <select v-model="initialA" :disabled="sessionActive">
+              <option v-for="initial in pinyinInitials" :key="`fa-${initial.value || 'none'}`" :value="initial.value">
+                {{ initial.value ? initial.label : '∅ — sem inicial' }}
+              </option>
+            </select>
+          </label>
+
+          <label>
+            <span class="field-label">Inicial B</span>
+            <select v-model="initialB" :disabled="sessionActive">
+              <option v-for="initial in pinyinInitials" :key="`fb-${initial.value || 'none'}`" :value="initial.value">
+                {{ initial.value ? initial.label : '∅ — sem inicial' }}
+              </option>
+            </select>
+          </label>
+
+          <label>
+            <span class="field-label">Quantidade</span>
+            <select v-model.number="requestedCards" :disabled="sessionActive">
+              <option v-for="quantity in quantityOptions" :key="quantity" :value="quantity">
+                {{ quantity }} flashcards
+              </option>
+            </select>
+          </label>
+
+          <button class="primary-action" type="button" :disabled="!candidates.length || sessionActive" @click="startSession">
+            Iniciar sessão
+          </button>
+        </div>
+
+        <p v-if="initialA === initialB" class="selection-notice">Escolha duas iniciais diferentes.</p>
+        <p v-else-if="!candidates.length" class="selection-notice">
+          Ainda não há combinações com áudio humano nos dois lados para estas iniciais.
+        </p>
+        <p v-else class="session-source-note">
+          {{ candidates.length }} combinações de final/tom disponíveis.
+          {{ usesSameSpeakerOnly ? 'O teste usará pares gravados pelo mesmo falante.' : 'Alguns pares disponíveis usam falantes diferentes.' }}
+        </p>
+      </div>
+
+      <div v-if="sessionActive && currentQuestion" class="flashcard-test-card">
+        <div class="flashcard-progress-row">
+          <span>Questão {{ currentIndex + 1 }} de {{ questions.length }}</span>
+          <progress :value="currentIndex + (answer ? 1 : 0)" :max="questions.length"></progress>
+        </div>
+
+        <p class="flashcard-round-label">Qual inicial você ouviu?</p>
+        <button class="flashcard-player" type="button" @click="playCurrentAudio">
+          {{ audioLoading ? 'Carregando…' : hasPlayed ? '▶ Ouvir novamente' : '▶ Ouvir áudio' }}
+        </button>
+        <p v-if="!hasPlayed" class="flashcard-hint">Ouça a gravação antes de responder.</p>
+
+        <div class="flashcard-choices">
+          <button
+            v-for="side in currentQuestion.answerOrder"
+            :key="side"
+            type="button"
+            :disabled="!hasPlayed || answer !== null"
+            :class="{
+              selected: answer === side,
+              correct: answer !== null && currentQuestion.targetSide === side,
+              wrong: answer === side && currentQuestion.targetSide !== side,
+            }"
+            @click="answerQuestion(side)"
+          >
+            <span>{{ side === 'a' ? 'Inicial A' : 'Inicial B' }}</span>
+            <strong>{{ displayInitial(side === 'a' ? initialA : initialB) }}</strong>
+          </button>
+        </div>
+
+        <div v-if="answer" class="flashcard-result" :class="answerIsCorrect ? 'correct' : 'wrong'" role="status">
+          <strong>{{ answerIsCorrect ? 'Correto.' : 'Incorreto.' }}</strong>
+          <span>
+            Você ouviu <b>{{ displayInitial(currentTargetInitial) }}</b> em <b>{{ currentPinyin }}</b>.
+            Final: <b>{{ currentQuestion.final }}</b> · tom {{ currentQuestion.tone === 5 ? 'neutro' : currentQuestion.tone }}.
+          </span>
+          <button type="button" @click="nextQuestion">
+            {{ currentIndex === questions.length - 1 ? 'Finalizar sessão' : 'Próximo flashcard' }}
+          </button>
+        </div>
+
+        <p v-if="audioError" class="audio-error" role="alert">{{ audioError }}</p>
+      </div>
+
+      <div v-if="sessionFinished" class="session-finished">
+        <p class="eyebrow">Sessão concluída</p>
+        <h2>{{ sessionCorrect }} acertos em {{ questions.length }}</h2>
+        <p>Precisão de {{ sessionAccuracy }}%. O resultado já foi salvo neste navegador.</p>
+        <button class="primary-action" type="button" @click="startSession">Treinar novamente</button>
+      </div>
+    </section>
+
+    <aside class="mini-dashboard" aria-label="Desempenho nos flashcards">
+      <div class="dashboard-title-row">
+        <div>
+          <p class="eyebrow">Desempenho</p>
+          <h2>{{ displayInitial(initialA) }} × {{ displayInitial(initialB) }}</h2>
+        </div>
+      </div>
+
+      <section class="dashboard-section">
+        <h3>Sessão atual</h3>
+        <div class="metric-grid">
+          <article><strong>{{ sessionCorrect }}</strong><span>acertos</span></article>
+          <article><strong>{{ sessionErrors }}</strong><span>erros</span></article>
+          <article><strong>{{ sessionAccuracy }}%</strong><span>precisão</span></article>
+          <article><strong>{{ answeredCount }}</strong><span>respondidos</span></article>
+        </div>
+      </section>
+
+      <section class="dashboard-section">
+        <h3>Histórico neste navegador</h3>
+        <div class="metric-grid compact">
+          <article><strong>{{ pairAttempts.length }}</strong><span>respostas</span></article>
+          <article><strong>{{ historicalAccuracy }}%</strong><span>precisão</span></article>
+          <article><strong>{{ historicalErrors }}</strong><span>erros</span></article>
+        </div>
+      </section>
+
+      <section class="dashboard-section">
+        <h3>Finais com mais erros</h3>
+        <p v-if="!worstFinals.length" class="dashboard-empty">Ainda não há erros registrados para este par.</p>
+        <ol v-else class="final-error-list">
+          <li v-for="summary in worstFinals" :key="summary.final">
+            <div>
+              <strong>{{ summary.final }}</strong>
+              <span>{{ summary.errors }} erros em {{ summary.attempts }}</span>
+            </div>
+            <b>{{ summary.errorRate }}%</b>
+          </li>
+        </ol>
+      </section>
+
+      <button
+        v-if="pairAttempts.length"
+        class="dashboard-reset"
+        type="button"
+        :disabled="sessionActive"
+        @click="clearPairHistory"
+      >
+        Limpar histórico deste par
+      </button>
+    </aside>
+  </section>
+</template>
