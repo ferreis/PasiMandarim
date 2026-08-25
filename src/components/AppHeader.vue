@@ -15,9 +15,9 @@ function closeMenu(): void {
 </script>
 
 <template>
-  <header class="app-header">
-    <a class="brand" href="#/comparison" aria-label="Voltar para a tela inicial" @click="closeMenu">
-      <svg class="brand-mark" viewBox="0 0 64 64" role="img" aria-label="Logo Learning Mandarin">
+  <header class="site-header">
+    <a class="site-brand" href="#/comparison" aria-label="Voltar para a tela inicial" @click="closeMenu">
+      <svg class="site-brand-mark" viewBox="0 0 64 64" role="img" aria-label="Logo Learning Mandarin">
         <rect x="3" y="3" width="58" height="58" rx="18" fill="currentColor" />
         <path d="M17 24h12" stroke="white" stroke-width="4" stroke-linecap="round" />
         <path d="M36 27l10-7" stroke="white" stroke-width="4" stroke-linecap="round" />
@@ -27,21 +27,21 @@ function closeMenu(): void {
       <span>Learning Mandarin</span>
     </a>
 
-    <div class="menu-shell">
+    <div class="site-menu-shell">
       <button
-        class="menu-trigger"
+        class="site-menu-trigger"
         type="button"
         :aria-expanded="menuOpen"
         aria-controls="main-menu"
         @click="menuOpen = !menuOpen"
       >
-        <span class="menu-icon" aria-hidden="true">
+        <span class="site-menu-icon" aria-hidden="true">
           <i></i><i></i><i></i>
         </span>
         Menu
       </button>
 
-      <nav v-if="menuOpen" id="main-menu" class="main-menu" aria-label="Menu principal">
+      <nav v-if="menuOpen" id="main-menu" class="site-main-menu" aria-label="Menu principal">
         <a
           href="#/comparison"
           :class="{ active: activeTab === 'comparison' }"
@@ -64,7 +64,7 @@ function closeMenu(): void {
 </template>
 
 <style scoped>
-.app-header {
+.site-header {
   position: relative;
   z-index: 20;
   display: flex;
@@ -74,7 +74,7 @@ function closeMenu(): void {
   margin-bottom: 42px;
 }
 
-.brand {
+.site-brand {
   display: inline-grid;
   justify-items: center;
   gap: 8px;
@@ -87,30 +87,30 @@ function closeMenu(): void {
   text-decoration: none;
 }
 
-.brand-mark {
+.site-brand-mark {
   width: 54px;
   height: 54px;
   color: #17202a;
   transition: transform 160ms ease;
 }
 
-.brand:hover .brand-mark,
-.brand:focus-visible .brand-mark {
+.site-brand:hover .site-brand-mark,
+.site-brand:focus-visible .site-brand-mark {
   transform: translateY(-2px);
 }
 
-.brand:focus-visible,
-.menu-trigger:focus-visible,
-.main-menu a:focus-visible {
+.site-brand:focus-visible,
+.site-menu-trigger:focus-visible,
+.site-main-menu a:focus-visible {
   outline: 3px solid rgba(23, 32, 42, 0.22);
   outline-offset: 4px;
 }
 
-.menu-shell {
+.site-menu-shell {
   position: relative;
 }
 
-.menu-trigger {
+.site-menu-trigger {
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -124,12 +124,12 @@ function closeMenu(): void {
   box-shadow: 0 8px 24px rgba(23, 32, 42, 0.06);
 }
 
-.menu-icon {
+.site-menu-icon {
   display: grid;
   gap: 3px;
 }
 
-.menu-icon i {
+.site-menu-icon i {
   display: block;
   width: 16px;
   height: 2px;
@@ -137,7 +137,7 @@ function closeMenu(): void {
   background: currentColor;
 }
 
-.main-menu {
+.site-main-menu {
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
@@ -151,7 +151,7 @@ function closeMenu(): void {
   box-shadow: 0 22px 55px rgba(23, 32, 42, 0.16);
 }
 
-.main-menu a {
+.site-main-menu a {
   display: grid;
   gap: 4px;
   padding: 13px 14px;
@@ -160,43 +160,43 @@ function closeMenu(): void {
   text-decoration: none;
 }
 
-.main-menu a:hover,
-.main-menu a.active {
+.site-main-menu a:hover,
+.site-main-menu a.active {
   background: #f1f4f7;
   color: #17202a;
 }
 
-.main-menu a.active {
+.site-main-menu a.active {
   box-shadow: inset 3px 0 0 #17202a;
 }
 
-.main-menu span {
+.site-main-menu span {
   font-weight: 900;
 }
 
-.main-menu small {
+.site-main-menu small {
   color: #687784;
   font-size: 0.77rem;
   line-height: 1.4;
 }
 
 @media (max-width: 620px) {
-  .app-header {
+  .site-header {
     align-items: center;
     margin-bottom: 30px;
   }
 
-  .brand {
+  .site-brand {
     min-width: 96px;
     font-size: 0.76rem;
   }
 
-  .brand-mark {
+  .site-brand-mark {
     width: 46px;
     height: 46px;
   }
 
-  .menu-trigger {
+  .site-menu-trigger {
     min-height: 42px;
   }
 }
