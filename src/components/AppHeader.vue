@@ -1,5 +1,5 @@
 <script setup lang="ts">
-type AppTab = 'comparison' | 'flashcards'
+type AppTab = 'comparison' | 'flashcards' | 'radicals'
 
 defineProps<{
   activeTab: AppTab
@@ -21,12 +21,9 @@ defineProps<{
       </a>
 
       <nav class="site-nav-links" aria-label="Menu principal">
-        <a href="#/comparison" :class="{ active: activeTab === 'comparison' }">
-          Comparação
-        </a>
-        <a href="#/flashcards" :class="{ active: activeTab === 'flashcards' }">
-          Flashcards
-        </a>
+        <a href="#/comparison" :class="{ active: activeTab === 'comparison' }">Comparação</a>
+        <a href="#/flashcards" :class="{ active: activeTab === 'flashcards' }">Flashcards</a>
+        <a href="#/radicals" :class="{ active: activeTab === 'radicals' }">Radicais</a>
       </nav>
     </div>
   </header>
@@ -87,8 +84,8 @@ defineProps<{
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 118px;
-  padding: 0 18px;
+  min-width: 108px;
+  padding: 0 16px;
   color: #52606d;
   font-size: 0.92rem;
   font-weight: 800;
@@ -107,9 +104,9 @@ defineProps<{
 
 .site-nav-links a.active::after {
   position: absolute;
-  right: 18px;
+  right: 16px;
   bottom: 0;
-  left: 18px;
+  left: 16px;
   height: 3px;
   border-radius: 999px 999px 0 0;
   background: #17202a;
@@ -126,7 +123,7 @@ defineProps<{
   .site-navbar-inner {
     width: min(100% - 24px, 1440px);
     min-height: 66px;
-    gap: 12px;
+    gap: 8px;
   }
 
   .site-brand {
@@ -139,19 +136,23 @@ defineProps<{
     height: 36px;
   }
 
+  .site-nav-links {
+    gap: 0;
+  }
+
   .site-nav-links a {
     min-width: auto;
-    padding: 0 11px;
-    font-size: 0.82rem;
+    padding: 0 9px;
+    font-size: 0.78rem;
   }
 
   .site-nav-links a.active::after {
-    right: 10px;
-    left: 10px;
+    right: 8px;
+    left: 8px;
   }
 }
 
-@media (max-width: 500px) {
+@media (max-width: 560px) {
   .site-navbar-inner {
     align-items: center;
   }
@@ -163,6 +164,13 @@ defineProps<{
   .site-nav-links {
     flex: 1;
     justify-content: flex-end;
+  }
+}
+
+@media (max-width: 420px) {
+  .site-nav-links a {
+    padding: 0 6px;
+    font-size: 0.72rem;
   }
 }
 </style>
