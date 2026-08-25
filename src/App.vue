@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import AppFooter from './components/AppFooter.vue'
 import AppHeader from './components/AppHeader.vue'
 import ComparisonTrainer from './components/ComparisonTrainer.vue'
 import FlashcardTrainer from './components/FlashcardTrainer.vue'
-import RadicalsExplorer from './components/RadicalsExplorer.vue'
+
+const RadicalsExplorer = defineAsyncComponent(() => import('./components/RadicalsExplorer.vue'))
 
 type AppTab = 'comparison' | 'flashcards' | 'radicals'
 
