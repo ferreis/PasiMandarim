@@ -1,62 +1,31 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-
 type AppTab = 'comparison' | 'flashcards'
 
 defineProps<{
   activeTab: AppTab
 }>()
-
-const menuOpen = ref(false)
-
-function closeMenu(): void {
-  menuOpen.value = false
-}
 </script>
 
 <template>
-  <header class="site-header">
-    <a class="site-brand" href="#/comparison" aria-label="Voltar para a tela inicial" @click="closeMenu">
-      <svg class="site-brand-mark" viewBox="0 0 64 64" role="img" aria-label="Logo Learning Mandarin">
-        <rect x="3" y="3" width="58" height="58" rx="18" fill="currentColor" />
-        <path d="M17 24h12" stroke="white" stroke-width="4" stroke-linecap="round" />
-        <path d="M36 27l10-7" stroke="white" stroke-width="4" stroke-linecap="round" />
-        <path d="M17 39c4-7 8-7 12 0" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" />
-        <path d="M36 36l10 8" stroke="white" stroke-width="4" stroke-linecap="round" />
-      </svg>
-      <span>Learning Mandarin</span>
-    </a>
+  <header class="site-navbar">
+    <div class="site-navbar-inner">
+      <a class="site-brand" href="#/comparison" aria-label="Voltar para a tela inicial">
+        <svg class="site-brand-mark" viewBox="0 0 64 64" role="img" aria-label="Logo Learning Mandarin">
+          <rect x="3" y="3" width="58" height="58" rx="18" fill="currentColor" />
+          <path d="M17 24h12" stroke="white" stroke-width="4" stroke-linecap="round" />
+          <path d="M36 27l10-7" stroke="white" stroke-width="4" stroke-linecap="round" />
+          <path d="M17 39c4-7 8-7 12 0" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" />
+          <path d="M36 36l10 8" stroke="white" stroke-width="4" stroke-linecap="round" />
+        </svg>
+        <span>Learning Mandarin</span>
+      </a>
 
-    <div class="site-menu-shell">
-      <button
-        class="site-menu-trigger"
-        type="button"
-        :aria-expanded="menuOpen"
-        aria-controls="main-menu"
-        @click="menuOpen = !menuOpen"
-      >
-        <span class="site-menu-icon" aria-hidden="true">
-          <i></i><i></i><i></i>
-        </span>
-        Menu
-      </button>
-
-      <nav v-if="menuOpen" id="main-menu" class="site-main-menu" aria-label="Menu principal">
-        <a
-          href="#/comparison"
-          :class="{ active: activeTab === 'comparison' }"
-          @click="closeMenu"
-        >
-          <span>Comparação</span>
-          <small>Compare iniciais mantendo final e tom iguais.</small>
+      <nav class="site-nav-links" aria-label="Menu principal">
+        <a href="#/comparison" :class="{ active: activeTab === 'comparison' }">
+          Comparação
         </a>
-        <a
-          href="#/flashcards"
-          :class="{ active: activeTab === 'flashcards' }"
-          @click="closeMenu"
-        >
-          <span>Flashcards</span>
-          <small>Treino auditivo com histórico de acertos e erros.</small>
+        <a href="#/flashcards" :class="{ active: activeTab === 'flashcards' }">
+          Flashcards
         </a>
       </nav>
     </div>
@@ -64,32 +33,40 @@ function closeMenu(): void {
 </template>
 
 <style scoped>
-.site-header {
-  position: relative;
-  z-index: 20;
+.site-navbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  width: 100%;
+  border-bottom: 1px solid #d9e0e7;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+}
+
+.site-navbar-inner {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 42px;
+  gap: 32px;
+  width: min(1440px, calc(100% - 48px));
+  min-height: 76px;
+  margin: 0 auto;
 }
 
 .site-brand {
-  display: inline-grid;
-  justify-items: center;
-  gap: 8px;
-  min-width: 118px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   color: #17202a;
-  font-size: 0.82rem;
   font-weight: 900;
-  line-height: 1.1;
-  text-align: center;
   text-decoration: none;
+  letter-spacing: -0.02em;
 }
 
 .site-brand-mark {
-  width: 54px;
-  height: 54px;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
   color: #17202a;
   transition: transform 160ms ease;
 }
@@ -99,105 +76,93 @@ function closeMenu(): void {
   transform: translateY(-2px);
 }
 
-.site-brand:focus-visible,
-.site-menu-trigger:focus-visible,
-.site-main-menu a:focus-visible {
-  outline: 3px solid rgba(23, 32, 42, 0.22);
-  outline-offset: 4px;
+.site-nav-links {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
 }
 
-.site-menu-shell {
+.site-nav-links a {
   position: relative;
-}
-
-.site-menu-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  min-height: 44px;
-  padding: 10px 16px;
-  border: 1px solid #d9e0e7;
-  border-radius: 12px;
-  background: #fff;
-  color: #17202a;
-  font-weight: 800;
-  box-shadow: 0 8px 24px rgba(23, 32, 42, 0.06);
-}
-
-.site-menu-icon {
-  display: grid;
-  gap: 3px;
-}
-
-.site-menu-icon i {
-  display: block;
-  width: 16px;
-  height: 2px;
-  border-radius: 999px;
-  background: currentColor;
-}
-
-.site-main-menu {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  display: grid;
-  gap: 6px;
-  width: min(330px, calc(100vw - 32px));
-  padding: 8px;
-  border: 1px solid #d9e0e7;
-  border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 22px 55px rgba(23, 32, 42, 0.16);
-}
-
-.site-main-menu a {
-  display: grid;
-  gap: 4px;
-  padding: 13px 14px;
-  border-radius: 11px;
+  justify-content: center;
+  min-width: 118px;
+  padding: 0 18px;
   color: #52606d;
+  font-size: 0.92rem;
+  font-weight: 800;
   text-decoration: none;
+  transition: color 140ms ease, background 140ms ease;
 }
 
-.site-main-menu a:hover,
-.site-main-menu a.active {
-  background: #f1f4f7;
+.site-nav-links a:hover {
+  background: #f7f9fb;
   color: #17202a;
 }
 
-.site-main-menu a.active {
-  box-shadow: inset 3px 0 0 #17202a;
+.site-nav-links a.active {
+  color: #17202a;
 }
 
-.site-main-menu span {
-  font-weight: 900;
+.site-nav-links a.active::after {
+  position: absolute;
+  right: 18px;
+  bottom: 0;
+  left: 18px;
+  height: 3px;
+  border-radius: 999px 999px 0 0;
+  background: #17202a;
+  content: '';
 }
 
-.site-main-menu small {
-  color: #687784;
-  font-size: 0.77rem;
-  line-height: 1.4;
+.site-brand:focus-visible,
+.site-nav-links a:focus-visible {
+  outline: 3px solid rgba(23, 32, 42, 0.22);
+  outline-offset: -3px;
 }
 
-@media (max-width: 620px) {
-  .site-header {
-    align-items: center;
-    margin-bottom: 30px;
+@media (max-width: 720px) {
+  .site-navbar-inner {
+    width: min(100% - 24px, 1440px);
+    min-height: 66px;
+    gap: 12px;
   }
 
   .site-brand {
-    min-width: 96px;
-    font-size: 0.76rem;
+    gap: 8px;
+    font-size: 0.84rem;
   }
 
   .site-brand-mark {
-    width: 46px;
-    height: 46px;
+    width: 36px;
+    height: 36px;
   }
 
-  .site-menu-trigger {
-    min-height: 42px;
+  .site-nav-links a {
+    min-width: auto;
+    padding: 0 11px;
+    font-size: 0.82rem;
+  }
+
+  .site-nav-links a.active::after {
+    right: 10px;
+    left: 10px;
+  }
+}
+
+@media (max-width: 500px) {
+  .site-navbar-inner {
+    align-items: center;
+  }
+
+  .site-brand span {
+    display: none;
+  }
+
+  .site-nav-links {
+    flex: 1;
+    justify-content: flex-end;
   }
 }
 </style>

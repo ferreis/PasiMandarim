@@ -31,9 +31,9 @@ const heroCopy = computed(() =>
 </script>
 
 <template>
-  <main class="page-shell">
-    <AppHeader :active-tab="activeTab" />
+  <AppHeader :active-tab="activeTab" />
 
+  <main class="page-shell">
     <section class="hero">
       <h1>{{ heroTitle }}</h1>
       <p class="hero-copy">{{ heroCopy }}</p>

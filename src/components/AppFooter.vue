@@ -46,7 +46,7 @@ import AudioLicenses from './AudioLicenses.vue'
 }
 
 .site-footer-inner {
-  width: min(1040px, calc(100% - 32px));
+  width: min(1440px, calc(100% - 48px));
   margin: 0 auto;
 }
 
@@ -110,6 +110,10 @@ import AudioLicenses from './AudioLicenses.vue'
 }
 
 @media (max-width: 760px) {
+  .site-footer-inner {
+    width: calc(100% - 24px);
+  }
+
   .project-footer {
     grid-template-columns: 1fr;
     gap: 20px;
