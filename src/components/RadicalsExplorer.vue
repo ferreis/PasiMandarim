@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { generatedRadicals } from '../data/generatedRadicals'
+import { getRadicalVariants } from '../data/radicalVariants'
 import type { MandarinRadical, RadicalHistoricalForm } from '../types/radical'
 
 const search = ref('')
@@ -18,6 +19,10 @@ const strokeOptions = computed(() =>
   [...new Set(generatedRadicals.map((radical) => radical.strokes))].sort((a, b) => a - b),
 )
 
+function variantsFor(radical: MandarinRadical): string[] {
+  return getRadicalVariants(radical.number, radical.variants)
+}
+
 const filteredRadicals = computed(() => {
   const query = search.value.trim().toLocaleLowerCase('pt-BR')
 
@@ -32,7 +37,7 @@ const filteredRadicals = computed(() => {
       radical.zhuyin,
       radical.meaningPt,
       radical.meaningEn,
-      ...radical.variants,
+      ...variantsFor(radical),
       ...radical.exampleCharacters,
       String(radical.number),
     ].some((value) => value.toLocaleLowerCase('pt-BR').includes(query))
@@ -41,6 +46,10 @@ const filteredRadicals = computed(() => {
 
 const selectedRadical = computed<MandarinRadical | undefined>(() =>
   generatedRadicals.find((radical) => radical.number === selectedNumber.value),
+)
+
+const selectedVariants = computed(() =>
+  selectedRadical.value ? variantsFor(selectedRadical.value) : [],
 )
 
 watch(filteredRadicals, (radicals) => {
@@ -59,7 +68,7 @@ watch(filteredRadicals, (radicals) => {
         <input
           v-model="search"
           type="search"
-          placeholder="Ex.: 水, shuǐ, água, 85…"
+          placeholder="Ex.: 水, shuǐ, água, 氵, 85…"
           autocomplete="off"
         />
       </label>
@@ -135,8 +144,8 @@ watch(filteredRadicals, (radicals) => {
             <strong>{{ selectedRadical.radicalCharacter }}</strong>
           </div>
           <div>
-            <span>Variantes</span>
-            <strong>{{ selectedRadical.variants.length ? selectedRadical.variants.join(' · ') : '—' }}</strong>
+            <span>Variantes usuais</span>
+            <strong>{{ selectedVariants.length ? selectedVariants.join(' · ') : '—' }}</strong>
           </div>
         </div>
 
@@ -178,7 +187,8 @@ watch(filteredRadicals, (radicals) => {
             <strong>Fonte verificável</strong>
             <p>
               Dados estruturados do Hanzi Project, revisão fixada. O projeto agrega fontes como
-              Unicode/Unihan e CNS de Taiwan e mantém a proveniência de cada campo.
+              Unicode/Unihan e CNS de Taiwan e mantém a proveniência de cada campo. Variantes usuais
+              adicionais são mantidas pelo Learning Mandarin como ajuda didática.
             </p>
           </div>
           <a :href="selectedRadical.sourceUrl" target="_blank" rel="noreferrer">Ver registro original</a>
@@ -508,6 +518,7 @@ watch(filteredRadicals, (radicals) => {
 
   .radical-detail-heading {
     align-items: flex-start;
+    flex-direction: column;
   }
 
   .radical-reading {
