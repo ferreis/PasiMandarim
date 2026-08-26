@@ -9,6 +9,7 @@ const props = defineProps<{
 }>()
 
 const guide = computed(() => getInitialPronunciationGuide(props.initial))
+const isAspirated = computed(() => guide.value?.aspiration === 'Aspirada')
 </script>
 
 <template>
@@ -24,15 +25,27 @@ const guide = computed(() => getInitialPronunciationGuide(props.initial))
       <span class="initial-family">{{ guide.family }}</span>
     </header>
 
-    <div class="initial-guide-tags" aria-label="Características fonéticas">
-      <span>{{ guide.place }}</span>
-      <span>{{ guide.manner }}</span>
-      <span>{{ guide.aspiration }}</span>
-      <span>{{ guide.voicing }}</span>
-    </div>
+    <dl class="initial-guide-facts" aria-label="Características fonéticas">
+      <div>
+        <dt>Lugar</dt>
+        <dd>{{ guide.place }}</dd>
+      </div>
+      <div>
+        <dt>Modo</dt>
+        <dd>{{ guide.manner }}</dd>
+      </div>
+      <div>
+        <dt>Aspiração</dt>
+        <dd>{{ guide.aspiration }}</dd>
+      </div>
+      <div>
+        <dt>Voz</dt>
+        <dd>{{ guide.voicing }}</dd>
+      </div>
+    </dl>
 
     <div class="initial-guide-layout">
-      <TonguePositionDiagram :type="guide.diagram" />
+      <TonguePositionDiagram :type="guide.diagram" :aspirated="isAspirated" />
 
       <div class="initial-guide-copy">
         <section>
@@ -129,25 +142,44 @@ const guide = computed(() => getInitialPronunciationGuide(props.initial))
   font-weight: 800;
 }
 
-.initial-guide-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  padding: 0 22px 18px;
+.initial-guide-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0 22px 18px;
+  overflow: hidden;
+  border: 1px solid #d9e0e7;
+  border-radius: 12px;
+  background: #d9e0e7;
 }
 
-.initial-guide-tags span {
-  padding: 5px 8px;
-  border: 1px solid #d9e0e7;
-  border-radius: 999px;
-  color: #52606d;
-  font-size: 0.72rem;
-  font-weight: 700;
+.initial-guide-facts > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 10px;
+  background: #f8fafb;
+}
+
+.initial-guide-facts dt {
+  color: #7a8793;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.initial-guide-facts dd {
+  margin: 0;
+  color: #425466;
+  font-size: 0.76rem;
+  font-weight: 800;
+  line-height: 1.3;
 }
 
 .initial-guide-layout {
   display: grid;
-  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.05fr);
   gap: 18px;
   padding: 0 22px 20px;
 }
@@ -202,9 +234,13 @@ const guide = computed(() => getInitialPronunciationGuide(props.initial))
   color: #52606d;
 }
 
-@media (max-width: 650px) {
+@media (max-width: 780px) {
   .initial-guide-layout {
     grid-template-columns: 1fr;
+  }
+
+  .initial-guide-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>
