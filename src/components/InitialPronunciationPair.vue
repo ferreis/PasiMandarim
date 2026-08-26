@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import InitialPronunciationGuide from './InitialPronunciationGuide.vue'
+import PronunciationGlossary from './PronunciationGlossary.vue'
 
 defineProps<{
   initialA: string
@@ -15,9 +16,11 @@ defineProps<{
         <h2 id="initial-guides-title">Como produzir as iniciais selecionadas</h2>
       </div>
       <p>
-        Os diagramas são esquemáticos. Use as gravações humanas como referência principal e a imagem como apoio para posicionar a boca e a língua.
+        Use a gravação humana como referência principal. O desenho mostra a anatomia e destaca a região aproximada onde a articulação acontece.
       </p>
     </div>
+
+    <PronunciationGlossary />
 
     <div class="initial-guides-grid">
       <InitialPronunciationGuide v-if="initialA" :initial="initialA" label="Inicial A" />
