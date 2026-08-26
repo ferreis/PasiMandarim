@@ -1,4 +1,5 @@
-name: Validate
+# Valida segurança, sincronização de dados, tipos, testes E2E e build antes de integrar alterações.
+name: Validação do projeto
 
 on:
   pull_request:
@@ -8,33 +9,43 @@ on:
 
 jobs:
   build:
+    name: Validar aplicação
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Baixar código
         uses: actions/checkout@v4
 
-      - name: Node.js
+      - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Install dependencies
+      - name: Instalar dependências
         run: npm install
 
-      - name: Check data sync scripts
+      - name: Auditar dependências de alta severidade
+        run: npm audit --audit-level=high
+
+      - name: Validar scripts de sincronização
         run: |
           node --check scripts/sync-human-audio.mjs
           node --check scripts/sync-web-audio-catalog.mjs
           node --check scripts/sync-radicals.mjs
 
-      - name: Generate human web audio catalog
+      - name: Gerar catálogo web de áudio humano
         run: npm run audio:web-catalog
 
-      - name: Generate radicals catalog
+      - name: Gerar catálogo de radicais
         run: npm run radicals:sync
 
-      - name: Typecheck
+      - name: Validar TypeScript
         run: npm run typecheck
 
-      - name: Build
+      - name: Instalar navegador do Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Executar testes automatizados no Playwright
+        run: npm run test:e2e
+
+      - name: Gerar build de produção
         run: npm run build
