@@ -11,6 +11,7 @@ import { getCommonFinals, pinyinInitials } from '../data/pinyinMatrix'
 import { playHumanAudio } from '../services/audioPlayer'
 import { buildToneMarkedPinyin } from '../utils/pinyin'
 import type { HumanAudioSample, MandarinTone } from '../types/audio'
+import InitialPronunciationPair from './InitialPronunciationPair.vue'
 
 const toneLabels: Record<MandarinTone, string> = {
   1: '1º tom',
@@ -111,7 +112,7 @@ async function listen(sample: HumanAudioSample | undefined, side: 'left' | 'righ
     <div class="controls-grid">
       <label>
         <span class="field-label">Inicial A</span>
-        <select v-model="initialA">
+        <select v-model="initialA" aria-label="Inicial A">
           <option v-for="initial in pinyinInitials" :key="`a-${initial.value || 'none'}`" :value="initial.value">
             {{ initial.value ? initial.label : '∅ — sem inicial' }}
           </option>
@@ -120,7 +121,7 @@ async function listen(sample: HumanAudioSample | undefined, side: 'left' | 'righ
 
       <label>
         <span class="field-label">Inicial B</span>
-        <select v-model="initialB">
+        <select v-model="initialB" aria-label="Inicial B">
           <option v-for="initial in pinyinInitials" :key="`b-${initial.value || 'none'}`" :value="initial.value">
             {{ initial.value ? initial.label : '∅ — sem inicial' }}
           </option>
@@ -190,5 +191,7 @@ async function listen(sample: HumanAudioSample | undefined, side: 'left' | 'righ
     <p class="audio-notice">
       O catálogo usa apenas gravações humanas verificadas. A interface oferece somente pares com áudio disponível para os dois lados. Créditos e licenças estão disponíveis no rodapé.
     </p>
+
+    <InitialPronunciationPair :initial-a="initialA" :initial-b="initialB" />
   </section>
 </template>
