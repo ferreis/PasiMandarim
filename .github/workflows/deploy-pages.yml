@@ -1,4 +1,5 @@
-name: Deploy static site
+# Gera os catálogos estáticos, valida o projeto e publica o build no GitHub Pages.
+name: Publicação do site estático
 
 on:
   push:
@@ -16,47 +17,49 @@ concurrency:
 
 jobs:
   build:
+    name: Preparar site estático
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout
+      - name: Baixar código
         uses: actions/checkout@v4
 
-      - name: Node.js
+      - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Install dependencies
+      - name: Instalar dependências
         run: npm install
 
-      - name: Generate human web audio catalog
+      - name: Gerar catálogo web de áudio humano
         run: npm run audio:web-catalog
 
-      - name: Generate radicals catalog
+      - name: Gerar catálogo de radicais
         run: npm run radicals:sync
 
-      - name: Typecheck
+      - name: Validar TypeScript
         run: npm run typecheck
 
-      - name: Build static site
+      - name: Gerar site estático
         run: npm run build
 
-      - name: Configure Pages
+      - name: Configurar GitHub Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload Pages artifact
+      - name: Enviar artefato do site
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
   deploy:
+    name: Publicar no GitHub Pages
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Publicar site
         id: deployment
         uses: actions/deploy-pages@v4
