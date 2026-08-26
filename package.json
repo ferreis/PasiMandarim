@@ -1,7 +1,7 @@
 {
   "name": "learning-mandarin",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -11,6 +11,7 @@
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "vue-tsc -b",
+    "test:e2e": "playwright test",
     "audio:web-catalog": "node scripts/sync-web-audio-catalog.mjs",
     "audio:sync": "node scripts/sync-human-audio.mjs",
     "audio:sync:force": "node scripts/sync-human-audio.mjs --force",
@@ -22,6 +23,7 @@
     "vue": "latest"
   },
   "devDependencies": {
+    "@playwright/test": "latest",
     "typescript": "6.0.2",
     "vue-tsc": "3.3.11"
   }
