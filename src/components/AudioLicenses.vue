@@ -14,6 +14,13 @@ const audioSources = [
     license: 'CC BY 2.0 FR',
     sourceUrl: 'https://commons.wikimedia.org/wiki/Category:Shtooka_Project',
   },
+  {
+    name: 'Sinosplice — Mandarin Chinese Tone Pair Drills',
+    speaker: 'Gravações humanas do acervo Sinosplice',
+    description: 'Palavras reais de duas sílabas usadas no treino de identificação dos 20 pares tonais.',
+    license: 'CC BY-NC-SA 2.5',
+    sourceUrl: 'https://www.sinosplice.com/learn-chinese/tone-pair-drills',
+  },
 ]
 </script>
 
@@ -71,7 +78,7 @@ const audioSources = [
 
 .license-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
 }
 

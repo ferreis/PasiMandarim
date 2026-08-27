@@ -1,7 +1,7 @@
 {
   "name": "learning-mandarin",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -15,6 +15,8 @@
     "audio:web-catalog": "node scripts/sync-web-audio-catalog.mjs",
     "audio:sync": "node scripts/sync-human-audio.mjs",
     "audio:sync:force": "node scripts/sync-human-audio.mjs --force",
+    "tone-pairs:sync": "node scripts/sync-tone-pair-audio.mjs",
+    "tone-pairs:sync:force": "node scripts/sync-tone-pair-audio.mjs --force",
     "radicals:sync": "node scripts/sync-radicals.mjs"
   },
   "dependencies": {
