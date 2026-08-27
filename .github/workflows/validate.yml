@@ -30,10 +30,14 @@ jobs:
         run: |
           node --check scripts/sync-human-audio.mjs
           node --check scripts/sync-web-audio-catalog.mjs
+          node --check scripts/sync-tone-pair-audio.mjs
           node --check scripts/sync-radicals.mjs
 
       - name: Gerar catálogo web de áudio humano
         run: npm run audio:web-catalog
+
+      - name: Baixar áudios humanos dos pares tonais
+        run: npm run tone-pairs:sync
 
       - name: Gerar catálogo de radicais
         run: npm run radicals:sync
