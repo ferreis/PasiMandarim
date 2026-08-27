@@ -9,6 +9,18 @@ async function mockAudio(page: import('@playwright/test').Page) {
   })
 }
 
+async function useDeterministicRandom(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(window.crypto, 'getRandomValues', {
+      configurable: true,
+      value(array: Uint32Array) {
+        array.fill(0)
+        return array
+      },
+    })
+  })
+}
+
 async function keepOnlyFirstTone(page: import('@playwright/test').Page, selectedTone: number) {
   const group = page.locator('.tone-selector-grid fieldset').nth(0)
   for (const tone of [1, 2, 3, 4]) {
@@ -92,6 +104,43 @@ test('treina um par tonal selecionado e salva o resultado no navegador', async (
 
   const stored = await page.evaluate(() => localStorage.getItem('learning-mandarin:tone-pair-attempts:v1'))
   expect(stored).toContain('1-1')
+  expect(stored).toContain('"tone1Correct":true')
+  expect(stored).toContain('"tone2Correct":true')
+})
+
+test('dá feedback parcial quando somente uma sílaba é identificada corretamente', async ({ page }) => {
+  await mockAudio(page)
+  await useDeterministicRandom(page)
+  await page.goto('/#/tones')
+
+  await keepOnlyFirstTone(page, 1)
+  const secondToneGroup = page.locator('.tone-selector-grid fieldset').nth(1)
+  await secondToneGroup.locator('label').nth(2).click()
+  await secondToneGroup.locator('label').nth(3).click()
+  await secondToneGroup.locator('label').nth(4).click()
+
+  await page.getByRole('button', { name: 'Iniciar treino' }).click()
+  await page.getByRole('button', { name: '▶ Ouvir palavra' }).click()
+
+  const answerGroups = page.locator('.tone-answer-grid fieldset')
+  await answerGroups.nth(0).getByRole('button', { name: '1º tom' }).click()
+  await answerGroups.nth(1).getByRole('button', { name: '2º tom' }).click()
+  await page.getByRole('button', { name: 'Confirmar resposta' }).click()
+
+  await expect(page.getByText('Parcialmente correto.', { exact: true })).toBeVisible()
+  await expect(page.getByText('Você acertou o tom da 1ª sílaba.', { exact: true })).toBeVisible()
+  await expect(answerGroups.nth(0)).toHaveClass(/syllable-correct/)
+  await expect(answerGroups.nth(1)).toHaveClass(/syllable-wrong/)
+  await expect(answerGroups.nth(0).getByRole('button', { name: '1º tom' })).toHaveClass(/answer-correct/)
+  await expect(answerGroups.nth(1).getByRole('button', { name: '2º tom' })).toHaveClass(/answer-wrong/)
+  await expect(page.locator('.tone-dashboard')).toContainText('1parciais')
+  await expect(page.locator('.syllable-performance-list')).toContainText('2ª sílaba')
+  await expect(page.locator('.syllable-performance-list')).toContainText('1 erros em 1')
+
+  const stored = await page.evaluate(() => localStorage.getItem('learning-mandarin:tone-pair-attempts:v1'))
+  expect(stored).toContain('"tone1Correct":true')
+  expect(stored).toContain('"tone2Correct":false')
+  expect(stored).toContain('"answerTone2":2')
 })
 
 test('explica o sandhi quando o par lexical é 3–3', async ({ page }) => {
