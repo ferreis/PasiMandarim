@@ -56,12 +56,16 @@ test('mostra como respostas somente os tons escolhidos na configuração', async
   await page.getByRole('button', { name: 'Iniciar treino' }).click()
   await page.getByRole('button', { name: '▶ Ouvir palavra' }).click()
 
-  const answerGroups = page.locator('.tone-answer-grid fieldset')
-  await expect(answerGroups.nth(0).getByRole('button')).toHaveCount(2)
-  await expect(answerGroups.nth(0).getByRole('button')).toHaveAttribute('aria-label', ['1º tom', '4º tom'])
+  const firstAnswers = page.locator('.tone-answer-grid fieldset').nth(0).getByRole('button')
+  await expect(firstAnswers).toHaveCount(2)
+  await expect(firstAnswers.nth(0)).toHaveAttribute('aria-label', '1º tom')
+  await expect(firstAnswers.nth(1)).toHaveAttribute('aria-label', '4º tom')
 
-  await expect(answerGroups.nth(1).getByRole('button')).toHaveCount(3)
-  await expect(answerGroups.nth(1).getByRole('button')).toHaveAttribute('aria-label', ['1º tom', '3º tom', 'Tom neutro'])
+  const secondAnswers = page.locator('.tone-answer-grid fieldset').nth(1).getByRole('button')
+  await expect(secondAnswers).toHaveCount(3)
+  await expect(secondAnswers.nth(0)).toHaveAttribute('aria-label', '1º tom')
+  await expect(secondAnswers.nth(1)).toHaveAttribute('aria-label', '3º tom')
+  await expect(secondAnswers.nth(2)).toHaveAttribute('aria-label', 'Tom neutro')
 })
 
 test('treina um par tonal selecionado e salva o resultado no navegador', async ({ page }) => {
