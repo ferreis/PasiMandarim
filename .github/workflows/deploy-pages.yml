@@ -35,6 +35,9 @@ jobs:
       - name: Gerar catálogo web de áudio humano
         run: npm run audio:web-catalog
 
+      - name: Baixar áudios humanos dos pares tonais
+        run: npm run tone-pairs:sync
+
       - name: Gerar catálogo de radicais
         run: npm run radicals:sync
 
