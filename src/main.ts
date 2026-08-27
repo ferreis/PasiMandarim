@@ -4,6 +4,7 @@ import './style.css'
 import './flashcards.css'
 import './tone-pairs.css'
 import './tone-symbols.css'
+import './tone-partial-feedback.css'
 import './layout.css'
 
 createApp(App).mount('#app')
