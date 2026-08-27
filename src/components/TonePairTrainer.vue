@@ -51,6 +51,13 @@ function shuffle<T>(items: T[]): T[] {
   return result
 }
 
+const activeFirstToneOptions = computed(() =>
+  firstToneOptions.filter((tone) => selectedFirstTones.value.includes(tone)),
+)
+const activeSecondToneOptions = computed(() =>
+  secondToneOptions.filter((tone) => selectedSecondTones.value.includes(tone)),
+)
+
 const candidates = computed(() => tonePairWords.filter((word) =>
   selectedFirstTones.value.includes(word.tone1) && selectedSecondTones.value.includes(word.tone2),
 ))
@@ -210,16 +217,16 @@ function resetHistory(): void {
         <div class="tone-answer-grid" :class="{ locked: !hasPlayed || answered }">
           <fieldset>
             <legend>Tom da 1ª sílaba?</legend>
-            <div class="tone-answer-buttons four">
-              <button v-for="tone in firstToneOptions" :key="tone" type="button" :aria-label="toneDisplay[tone].label" :disabled="!hasPlayed || answered" :class="{ selected: answerTone1 === tone }" @click="answerTone1 = tone">
+            <div class="tone-answer-buttons" :style="{ gridTemplateColumns: `repeat(${activeFirstToneOptions.length}, minmax(0, 1fr))` }">
+              <button v-for="tone in activeFirstToneOptions" :key="tone" type="button" :aria-label="toneDisplay[tone].label" :disabled="!hasPlayed || answered" :class="{ selected: answerTone1 === tone }" @click="answerTone1 = tone">
                 <strong class="tone-symbol">{{ toneDisplay[tone].symbol }}</strong><span>{{ toneDisplay[tone].shortLabel }}</span>
               </button>
             </div>
           </fieldset>
           <fieldset>
             <legend>Tom da 2ª sílaba?</legend>
-            <div class="tone-answer-buttons five">
-              <button v-for="tone in secondToneOptions" :key="tone" type="button" :aria-label="toneDisplay[tone].label" :disabled="!hasPlayed || answered" :class="{ selected: answerTone2 === tone }" @click="answerTone2 = tone">
+            <div class="tone-answer-buttons" :style="{ gridTemplateColumns: `repeat(${activeSecondToneOptions.length}, minmax(0, 1fr))` }">
+              <button v-for="tone in activeSecondToneOptions" :key="tone" type="button" :aria-label="toneDisplay[tone].label" :disabled="!hasPlayed || answered" :class="{ selected: answerTone2 === tone }" @click="answerTone2 = tone">
                 <strong class="tone-symbol">{{ toneDisplay[tone].symbol }}</strong><span>{{ toneDisplay[tone].shortLabel }}</span>
               </button>
             </div>
