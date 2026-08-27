@@ -26,6 +26,12 @@ async function keepOnlySecondTone(page: import('@playwright/test').Page, selecte
   }
 }
 
+async function expectSingleTonePair(page: import('@playwright/test').Page) {
+  const summary = page.locator('.tone-selection-summary')
+  await expect(summary.locator('strong')).toHaveText('1')
+  await expect(summary.locator('span')).toContainText('pares selecionados')
+}
+
 test('treina um par tonal selecionado e salva o resultado no navegador', async ({ page }) => {
   await mockAudio(page)
   await page.goto('/#/tones')
@@ -34,8 +40,8 @@ test('treina um par tonal selecionado e salva o resultado no navegador', async (
 
   await keepOnlyFirstTone(page, 1)
   await keepOnlySecondTone(page, 1)
+  await expectSingleTonePair(page)
 
-  await expect(page.locator('.tone-selection-summary')).toContainText('1 pares selecionados')
   await page.getByRole('button', { name: 'Iniciar treino' }).click()
   await page.getByRole('button', { name: '▶ Ouvir palavra' }).click()
 
@@ -57,8 +63,8 @@ test('explica o sandhi quando o par lexical é 3–3', async ({ page }) => {
 
   await keepOnlyFirstTone(page, 3)
   await keepOnlySecondTone(page, 3)
+  await expectSingleTonePair(page)
 
-  await expect(page.locator('.tone-selection-summary')).toContainText('1 pares selecionados')
   await page.getByRole('button', { name: 'Iniciar treino' }).click()
   await page.getByRole('button', { name: '▶ Ouvir palavra' }).click()
 
