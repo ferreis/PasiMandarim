@@ -62,7 +62,7 @@ test('mostra os cinco tons na comparação sem inventar áudio neutro isolado', 
 
   const neutral = toneSelect.locator('option[value="5"]')
   await expect(neutral).toContainText('· Tom neutro')
-  await expect(neutral).toBeDisabled()
+  await expect(neutral).toHaveAttribute('disabled', '')
   await expect(page.locator('.neutral-tone-note')).toContainText('contextual')
   await expect(page.locator('.neutral-tone-note')).toContainText('Tons')
 })
