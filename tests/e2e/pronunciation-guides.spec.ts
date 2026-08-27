@@ -49,3 +49,20 @@ test('explica os termos fonéticos usados nos guias', async ({ page }) => {
   await place.click()
   await expect(page.getByText(/região da boca onde o ar é bloqueado/i)).toBeVisible()
 })
+
+test('mostra os cinco tons na comparação sem inventar áudio neutro isolado', async ({ page }) => {
+  await page.goto('/#/comparison')
+
+  const toneSelect = page.getByLabel('Tom da comparação')
+  await expect(toneSelect.locator('option')).toHaveCount(5)
+  await expect(toneSelect.locator('option[value="1"]')).toContainText('ˉ 1º tom')
+  await expect(toneSelect.locator('option[value="2"]')).toContainText('ˊ 2º tom')
+  await expect(toneSelect.locator('option[value="3"]')).toContainText('ˇ 3º tom')
+  await expect(toneSelect.locator('option[value="4"]')).toContainText('ˋ 4º tom')
+
+  const neutral = toneSelect.locator('option[value="5"]')
+  await expect(neutral).toContainText('· Tom neutro')
+  await expect(neutral).toHaveAttribute('disabled', '')
+  await expect(page.locator('.neutral-tone-note')).toContainText('contextual')
+  await expect(page.locator('.neutral-tone-note')).toContainText('Tons')
+})

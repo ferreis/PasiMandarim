@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { tonePairKey, tonePairWords } from '../data/tonePairCatalog'
+import { toneDisplay } from '../data/toneDisplay'
 import { playTonePairWord } from '../services/tonePairAudio'
 import { clearTonePairAttempts, loadTonePairAttempts, saveTonePairAttempt } from '../services/tonePairStats'
 import type { ToneNumber, TonePairAttempt, TonePairWord } from '../types/tonePair'
@@ -29,7 +30,7 @@ const sessionErrors = ref(0)
 const attempts = ref<TonePairAttempt[]>(loadTonePairAttempts())
 
 function toneLabel(tone: ToneNumber): string {
-  return tone === 5 ? 'Tom neutro' : `${tone}º tom`
+  return toneDisplay[tone].label
 }
 
 function randomIndex(max: number): number {
@@ -158,7 +159,7 @@ function resetHistory(): void {
       <div class="tone-setup-copy">
         <p class="eyebrow">Configuração</p>
         <h2>Escolha quais tons quer treinar</h2>
-        <p>A primeira sílaba usa os tons 1–4. A segunda pode usar 1–4 ou o tom neutro. As opções marcadas são combinadas e as palavras são sorteadas.</p>
+        <p>A primeira sílaba usa os tons 1–4. A segunda pode usar 1–4 ou o tom neutro. Os símbolos mostram o contorno gráfico convencional de cada tom.</p>
       </div>
 
       <div class="tone-selector-grid">
@@ -167,7 +168,10 @@ function resetHistory(): void {
           <div class="tone-checkboxes first-tone-options">
             <label v-for="tone in firstToneOptions" :key="tone">
               <input v-model="selectedFirstTones" type="checkbox" :value="tone" :disabled="sessionActive" />
-              <span>{{ tone }}º</span>
+              <span class="tone-option-content">
+                <strong class="tone-symbol">{{ toneDisplay[tone].symbol }}</strong>
+                <small>{{ toneDisplay[tone].shortLabel }}</small>
+              </span>
             </label>
           </div>
         </fieldset>
@@ -176,7 +180,10 @@ function resetHistory(): void {
           <div class="tone-checkboxes second-tone-options">
             <label v-for="tone in secondToneOptions" :key="tone">
               <input v-model="selectedSecondTones" type="checkbox" :value="tone" :disabled="sessionActive" />
-              <span>{{ toneLabel(tone) }}</span>
+              <span class="tone-option-content">
+                <strong class="tone-symbol">{{ toneDisplay[tone].symbol }}</strong>
+                <small>{{ toneDisplay[tone].shortLabel }}</small>
+              </span>
             </label>
           </div>
         </fieldset>
@@ -201,13 +208,30 @@ function resetHistory(): void {
         </div>
 
         <div class="tone-answer-grid" :class="{ locked: !hasPlayed || answered }">
-          <fieldset><legend>Tom da 1ª sílaba?</legend><div class="tone-answer-buttons four"><button v-for="tone in firstToneOptions" :key="tone" type="button" :disabled="!hasPlayed || answered" :class="{ selected: answerTone1 === tone }" @click="answerTone1 = tone">{{ tone }}º</button></div></fieldset>
-          <fieldset><legend>Tom da 2ª sílaba?</legend><div class="tone-answer-buttons five"><button v-for="tone in secondToneOptions" :key="tone" type="button" :disabled="!hasPlayed || answered" :class="{ selected: answerTone2 === tone }" @click="answerTone2 = tone">{{ tone === 5 ? 'Neutro' : `${tone}º` }}</button></div></fieldset>
+          <fieldset>
+            <legend>Tom da 1ª sílaba?</legend>
+            <div class="tone-answer-buttons four">
+              <button v-for="tone in firstToneOptions" :key="tone" type="button" :aria-label="toneDisplay[tone].label" :disabled="!hasPlayed || answered" :class="{ selected: answerTone1 === tone }" @click="answerTone1 = tone">
+                <strong class="tone-symbol">{{ toneDisplay[tone].symbol }}</strong><span>{{ toneDisplay[tone].shortLabel }}</span>
+              </button>
+            </div>
+          </fieldset>
+          <fieldset>
+            <legend>Tom da 2ª sílaba?</legend>
+            <div class="tone-answer-buttons five">
+              <button v-for="tone in secondToneOptions" :key="tone" type="button" :aria-label="toneDisplay[tone].label" :disabled="!hasPlayed || answered" :class="{ selected: answerTone2 === tone }" @click="answerTone2 = tone">
+                <strong class="tone-symbol">{{ toneDisplay[tone].symbol }}</strong><span>{{ toneDisplay[tone].shortLabel }}</span>
+              </button>
+            </div>
+          </fieldset>
         </div>
         <button v-if="!answered" class="confirm-tone-answer" type="button" :disabled="!hasPlayed || !answerTone1 || !answerTone2" @click="confirmAnswer">Confirmar resposta</button>
 
         <div v-else class="tone-result" :class="answerIsCorrect ? 'correct' : 'wrong'" role="status">
-          <div><strong>{{ answerIsCorrect ? 'Correto.' : 'Incorreto.' }}</strong><span>O par é <b>{{ currentQuestion.tone1 }}–{{ currentQuestion.tone2 }}</b>: {{ toneLabel(currentQuestion.tone1) }} + {{ toneLabel(currentQuestion.tone2) }}.</span></div>
+          <div>
+            <strong>{{ answerIsCorrect ? 'Correto.' : 'Incorreto.' }}</strong>
+            <span>O par é <b>{{ currentQuestion.tone1 }}–{{ currentQuestion.tone2 }}</b>: {{ toneDisplay[currentQuestion.tone1].symbol }} {{ toneLabel(currentQuestion.tone1) }} + {{ toneDisplay[currentQuestion.tone2].symbol }} {{ toneLabel(currentQuestion.tone2) }}.</span>
+          </div>
           <p v-if="currentQuestion.tone1 === 3 && currentQuestion.tone2 === 3" class="sandhi-note"><b>Regra especial 3–3:</b> na fala contínua, o primeiro 3º tom normalmente sofre sandhi e é realizado com contorno semelhante ao 2º. A resposta mostra os tons lexicais.</p>
           <button type="button" @click="nextQuestion">{{ currentIndex === questions.length - 1 ? 'Finalizar sessão' : 'Próxima palavra' }}</button>
         </div>
@@ -218,7 +242,10 @@ function resetHistory(): void {
         <p class="eyebrow">Sessão concluída</p><h2>{{ sessionCorrect }} acertos em {{ questions.length }}</h2><p>Precisão de {{ sessionAccuracy }}%. O histórico foi salvo somente neste navegador.</p><button class="primary-action" type="button" @click="startSession">Treinar novamente</button>
       </div>
 
-      <aside class="tone-pedagogy-note"><strong>Por que 4 × 5?</strong><p>São quatro possibilidades lexicais na primeira sílaba e cinco na segunda quando incluímos o tom neutro, totalizando 20 pares. Mudanças tonais como o sandhi do 3º tom continuam existindo na fala natural.</p></aside>
+      <aside class="tone-pedagogy-note">
+        <strong>Como ler os símbolos?</strong>
+        <p>ˉ representa o 1º tom nivelado; ˊ o 2º ascendente; ˇ o 3º baixo com mudança de direção; ˋ o 4º descendente; · representa o tom neutro contextual.</p>
+      </aside>
     </section>
 
     <aside class="mini-dashboard tone-dashboard" aria-label="Desempenho no treino de tons">

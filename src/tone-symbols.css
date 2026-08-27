@@ -1,0 +1,25 @@
+.tone-select-help {
+  display: block;
+  margin-top: 7px;
+  color: #687784;
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.neutral-tone-note {
+  margin: 18px 0 0;
+  padding: 13px 15px;
+  border-radius: 12px;
+  background: #eef4f8;
+  color: #425466;
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.neutral-tone-note strong {
+  color: #17202a;
+}
+
+.neutral-tone-note a {
+  font-weight: 800;
+}

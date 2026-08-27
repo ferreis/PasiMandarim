@@ -8,18 +8,11 @@ import {
   samplesUseSameSpeaker,
 } from '../data/audioCatalog'
 import { getCommonFinals, pinyinInitials } from '../data/pinyinMatrix'
+import { mandarinTones, toneDisplay, toneText } from '../data/toneDisplay'
 import { playHumanAudio } from '../services/audioPlayer'
 import { buildToneMarkedPinyin } from '../utils/pinyin'
 import type { HumanAudioSample, MandarinTone } from '../types/audio'
 import InitialPronunciationPair from './InitialPronunciationPair.vue'
-
-const toneLabels: Record<MandarinTone, string> = {
-  1: '1º tom',
-  2: '2º tom',
-  3: '3º tom',
-  4: '4º tom',
-  5: 'Tom neutro',
-}
 
 const initialA = ref('b')
 const initialB = ref('p')
@@ -44,6 +37,7 @@ const toneOptions = computed(() =>
     ? getAvailableTonesForPair(initialA.value, initialB.value, selectedFinal.value)
     : [],
 )
+const neutralToneAvailable = computed(() => toneOptions.value.includes(5))
 
 function normalizeSelection(): void {
   if (!finalOptions.value.includes(selectedFinal.value)) {
@@ -136,12 +130,28 @@ async function listen(sample: HumanAudioSample | undefined, side: 'left' | 'righ
       </label>
 
       <label>
-        <span class="field-label">Tom disponível</span>
-        <select v-model.number="selectedTone" :disabled="!toneOptions.length">
-          <option v-for="tone in toneOptions" :key="tone" :value="tone">{{ toneLabels[tone] }}</option>
+        <span class="field-label">Tom</span>
+        <select v-model.number="selectedTone" :disabled="!toneOptions.length" aria-label="Tom da comparação">
+          <option
+            v-for="tone in mandarinTones"
+            :key="tone"
+            :value="tone"
+            :disabled="!toneOptions.includes(tone)"
+          >
+            {{ toneText(tone) }}{{ toneOptions.includes(tone) ? '' : ' — sem áudio neste par' }}
+          </option>
         </select>
+        <span class="tone-select-help">
+          {{ toneDisplay[selectedTone].symbol }} {{ toneDisplay[selectedTone].explanation }}
+        </span>
       </label>
     </div>
+
+    <p v-if="!neutralToneAvailable && finalOptions.length" class="neutral-tone-note">
+      <strong>· Tom neutro:</strong> ele é contextual e normalmente ocorre em sílabas átonas dentro de palavras.
+      O acervo de sílabas isoladas não possui uma gravação neutra confiável para este par; por isso ele aparece desabilitado aqui.
+      Na área <a href="#/tones">Tons</a>, o neutro é treinado dentro de palavras humanas reais.
+    </p>
 
     <p v-if="!commonFinalOptions.length" class="selection-notice">
       Essas duas iniciais não compartilham nenhuma final válida no Pinyin.
