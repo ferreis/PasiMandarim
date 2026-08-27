@@ -41,6 +41,29 @@ test('mostra os símbolos dos cinco tons', async ({ page }) => {
   await expect(secondToneGroup).toContainText('Neutro')
 })
 
+test('mostra como respostas somente os tons escolhidos na configuração', async ({ page }) => {
+  await mockAudio(page)
+  await page.goto('/#/tones')
+
+  const firstToneGroup = page.locator('.tone-selector-grid fieldset').nth(0)
+  await firstToneGroup.locator('label').nth(1).click()
+  await firstToneGroup.locator('label').nth(2).click()
+
+  const secondToneGroup = page.locator('.tone-selector-grid fieldset').nth(1)
+  await secondToneGroup.locator('label').nth(1).click()
+  await secondToneGroup.locator('label').nth(3).click()
+
+  await page.getByRole('button', { name: 'Iniciar treino' }).click()
+  await page.getByRole('button', { name: '▶ Ouvir palavra' }).click()
+
+  const answerGroups = page.locator('.tone-answer-grid fieldset')
+  await expect(answerGroups.nth(0).getByRole('button')).toHaveCount(2)
+  await expect(answerGroups.nth(0).getByRole('button')).toHaveAttribute('aria-label', ['1º tom', '4º tom'])
+
+  await expect(answerGroups.nth(1).getByRole('button')).toHaveCount(3)
+  await expect(answerGroups.nth(1).getByRole('button')).toHaveAttribute('aria-label', ['1º tom', '3º tom', 'Tom neutro'])
+})
+
 test('treina um par tonal selecionado e salva o resultado no navegador', async ({ page }) => {
   await mockAudio(page)
   await page.goto('/#/tones')
