@@ -9,20 +9,33 @@ async function mockAudio(page: import('@playwright/test').Page) {
   })
 }
 
+async function keepOnlyFirstTone(page: import('@playwright/test').Page, selectedTone: number) {
+  const group = page.locator('.tone-selector-grid fieldset').nth(0)
+  for (const tone of [1, 2, 3, 4]) {
+    if (tone !== selectedTone) {
+      await group.getByText(`${tone}º`, { exact: true }).click()
+    }
+  }
+}
+
+async function keepOnlySecondTone(page: import('@playwright/test').Page, selectedTone: number) {
+  const group = page.locator('.tone-selector-grid fieldset').nth(1)
+  for (const tone of [1, 2, 3, 4, 5]) {
+    if (tone === selectedTone) continue
+    await group.getByText(tone === 5 ? 'Tom neutro' : `${tone}º tom`, { exact: true }).click()
+  }
+}
+
 test('treina um par tonal selecionado e salva o resultado no navegador', async ({ page }) => {
   await mockAudio(page)
   await page.goto('/#/tones')
 
   await expect(page.getByRole('heading', { name: 'Identificação de pares tonais' })).toBeVisible()
 
-  const setupGroups = page.locator('.tone-selector-grid fieldset')
-  const firstToneChecks = setupGroups.nth(0).locator('input[type="checkbox"]')
-  const secondToneChecks = setupGroups.nth(1).locator('input[type="checkbox"]')
+  await keepOnlyFirstTone(page, 1)
+  await keepOnlySecondTone(page, 1)
 
-  for (let index = 1; index < 4; index += 1) await firstToneChecks.nth(index).uncheck()
-  for (let index = 1; index < 5; index += 1) await secondToneChecks.nth(index).uncheck()
-
-  await expect(page.locator('.tone-selection-summary')).toContainText('1')
+  await expect(page.locator('.tone-selection-summary')).toContainText('1 pares selecionados')
   await page.getByRole('button', { name: 'Iniciar treino' }).click()
   await page.getByRole('button', { name: '▶ Ouvir palavra' }).click()
 
@@ -42,18 +55,10 @@ test('explica o sandhi quando o par lexical é 3–3', async ({ page }) => {
   await mockAudio(page)
   await page.goto('/#/tones')
 
-  const setupGroups = page.locator('.tone-selector-grid fieldset')
-  const firstToneChecks = setupGroups.nth(0).locator('input[type="checkbox"]')
-  const secondToneChecks = setupGroups.nth(1).locator('input[type="checkbox"]')
+  await keepOnlyFirstTone(page, 3)
+  await keepOnlySecondTone(page, 3)
 
-  await firstToneChecks.nth(0).uncheck()
-  await firstToneChecks.nth(1).uncheck()
-  await firstToneChecks.nth(3).uncheck()
-  await secondToneChecks.nth(0).uncheck()
-  await secondToneChecks.nth(1).uncheck()
-  await secondToneChecks.nth(3).uncheck()
-  await secondToneChecks.nth(4).uncheck()
-
+  await expect(page.locator('.tone-selection-summary')).toContainText('1 pares selecionados')
   await page.getByRole('button', { name: 'Iniciar treino' }).click()
   await page.getByRole('button', { name: '▶ Ouvir palavra' }).click()
 
