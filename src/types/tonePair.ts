@@ -15,5 +15,10 @@ export type TonePairAttempt = {
   tone2: ToneNumber
   hanzi: string
   correct: boolean
+  /** Campos opcionais mantêm compatibilidade com o histórico salvo antes do feedback parcial. */
+  answerTone1?: Exclude<ToneNumber, 5>
+  answerTone2?: ToneNumber
+  tone1Correct?: boolean
+  tone2Correct?: boolean
   answeredAt: string
 }
