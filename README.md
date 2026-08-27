@@ -38,6 +38,30 @@ A cada sessão:
 
 O mini-dashboard mostra acertos, erros, precisão, histórico do par de iniciais e as finais em que o usuário mais erra.
 
+## Identificação de pares tonais
+
+A tela **Tons** treina palavras reais de duas sílabas. A primeira sílaba pode ter um dos quatro tons lexicais e a segunda pode ter os tons 1–4 ou o **tom neutro**, formando 20 categorias possíveis.
+
+O usuário pode selecionar separadamente:
+
+- quais tons `1–4` podem aparecer na primeira sílaba;
+- quais opções `1–4 + neutro` podem aparecer na segunda sílaba;
+- a quantidade de palavras da sessão.
+
+Durante uma questão, a palavra e o Pinyin ficam escondidos. O usuário ouve a gravação humana e escolhe o tom de cada sílaba. Depois de confirmar, o sistema revela o Hanzi, Pinyin, tradução em português, resposta correta e atualiza o histórico salvo no navegador.
+
+O dashboard registra os pares com mais erros. Para o par lexical `3–3`, a interface também explica o sandhi do terceiro tom: na fala contínua, o primeiro terceiro tom normalmente é realizado com um contorno semelhante ao segundo.
+
+### Áudios dos pares tonais
+
+As palavras vêm do **Mandarin Chinese Tone Pair Drills**, de John Pasden / Sinosplice, distribuído sob **CC BY-NC-SA 2.5**. Os arquivos são gravações humanas e são baixados durante a preparação do site estático.
+
+```bash
+npm run tone-pairs:sync
+```
+
+O script valida a origem HTTPS, tipo e tamanho do arquivo e exige cobertura das 20 combinações antes de concluir.
+
 ## Radicais chineses
 
 A tela **Radicais** apresenta os **214 radicais Kangxi** e permite pesquisar por símbolo, número, Pinyin, Zhuyin, significado em português, variante e caracteres de exemplo.
@@ -64,13 +88,9 @@ O projeto diferencia a leitura do caractere usado como radical do nome coloquial
 - `水` → `shuǐ`;
 - `氵` é uma variante de água e costuma ser chamada `三点水 (sān diǎn shuǐ)`.
 
-Isso evita apresentar o Pinyin do caractere como se fosse necessariamente o nome usado para todas as suas formas posicionais.
-
 ### Fonte dos radicais
 
 Os dados estruturados são sincronizados a partir de uma revisão fixada do projeto `bluegreenstone/hanzi-project`, que mantém proveniência por campo e agrega fontes como Unicode/Unihan, CNS de Taiwan e acervos históricos.
-
-A camada de traduções e explicações em português é mantida pelo Learning Mandarin. Quando a fonte não possui uma forma histórica verificada, a interface informa a ausência em vez de inventar uma etimologia.
 
 Para regenerar o catálogo completo:
 
@@ -78,96 +98,63 @@ Para regenerar o catálogo completo:
 npm run radicals:sync
 ```
 
-O script valida que os **214** registros foram obtidos antes de gerar `src/data/generatedRadicals.ts`.
-
 ## Stack
 
 - Vue 3
 - Vite
 - TypeScript
 - HTML Audio API
-- `localStorage` para histórico dos flashcards
+- `localStorage` para históricos de treino
+- Playwright para testes E2E
 - Node.js 22+ para geração/sincronização dos catálogos
-- `tar` com suporte a XZ para extrair os pacotes completos Shtooka/SWAC
 
 ## Matriz de Pinyin
 
 A matriz compartilhada fica em `data/pinyin-matrix.json` e contém as combinações válidas de iniciais e finais usadas pelo frontend e pelo sincronizador de áudio.
 
-A matriz de inicial + final é fonotática. Isso não significa que todos os cinco tons existam como palavras reais para toda sílaba. Por exemplo, duas iniciais podem aceitar a final `a`, mas um dos tons pode não possuir uma sílaba lexical correspondente ou uma gravação isolada disponível. Por isso o seletor de tom usa a interseção dos áudios realmente catalogados.
+A matriz de inicial + final é fonotática. Isso não significa que todos os cinco tons existam como palavras reais para toda sílaba. Por isso o seletor de tom do comparador usa a interseção dos áudios realmente catalogados.
 
-O sistema trata as regras ortográficas especiais do Pinyin. Exemplos:
-
-- sem inicial + `ian` → `yan`;
-- sem inicial + `u` → `wu`;
-- sem inicial + `ü` → `yu`;
-- `j` + `üe` → `jue`;
-- `q` + `üan` → `quan`.
+O sistema trata regras ortográficas especiais do Pinyin, como `yan`, `wu`, `yu`, `jue` e `quan`.
 
 ## Áudio humano
 
-O projeto utiliza gravações humanas verificáveis e mantém os respectivos créditos/licenças no rodapé da aplicação. Para o ambiente web estático, o catálogo principal é otimizado para reprodução no navegador; o projeto também possui sincronização dos acervos Shtooka/SWAC.
+O projeto utiliza somente gravações humanas verificáveis como referência e mantém créditos/licenças no rodapé da aplicação. Cada acervo permanece sujeito à sua licença própria.
 
-### Baixar os áudios diretamente
+### Sincronizar sílabas Shtooka/SWAC
 
 ```bash
 npm install
 npm run audio:sync
 ```
 
-O sincronizador:
-
-1. lê todas as combinações de `data/pinyin-matrix.json`;
-2. baixa pacotes Shtooka/SWAC configurados;
-3. extrai os arquivos e lê os metadados originais;
-4. aceita apenas entradas monossilábicas que possam ser mapeadas com segurança para inicial + final + tom;
-5. copia as gravações aceitas para `public/audio/shtooka/`;
-6. consulta fontes complementares configuradas para tentar preencher lacunas;
-7. gera o catálogo consumido pelo frontend;
-8. informa a cobertura final da matriz.
-
-Os pacotes baixados e extraídos ficam em `.cache/shtooka/` e não são versionados.
-
-Para baixar novamente arquivos já existentes:
+### Preparar os áudios do treino de tons
 
 ```bash
-npm run audio:sync:force
+npm run tone-pairs:sync
 ```
 
-## Por que ainda pode faltar um tom?
-
-O contador de gravações não significa cobertura completa da matriz. Ele representa quantas combinações `inicial + final + tom` foram encontradas com gravação humana isolada e verificável.
-
-Nem toda combinação teórica possui uma palavra real em mandarim. Além disso, uma palavra pode existir, mas não estar presente nas coleções abertas usadas pelo projeto. O sistema não cria áudio sintético para preencher essas lacunas.
-
-Para evitar exercícios quebrados, a interface:
-
-- mostra apenas finais que possuem pelo menos um mesmo tom gravado para A e B;
-- mostra apenas tons com gravação humana nos dois lados;
-- não gera uma questão de flashcard sem um par reproduzível.
+O projeto nunca usa TTS ou voz gerada por IA para preencher uma gravação ausente.
 
 ## Estrutura
 
 ```text
 data/
-└── pinyin-matrix.json
+├── pinyin-matrix.json
+└── tone-pairs.json
 
 scripts/
 ├── sync-human-audio.mjs
 ├── sync-web-audio-catalog.mjs
+├── sync-tone-pair-audio.mjs
 └── sync-radicals.mjs
 
 src/
 ├── components/
 │   ├── ComparisonTrainer.vue
 │   ├── FlashcardTrainer.vue
+│   ├── TonePairTrainer.vue
 │   └── RadicalsExplorer.vue
 ├── data/
-│   ├── audioCatalog.ts
-│   ├── generatedAudioCatalog.ts
-│   ├── generatedRadicals.ts
-│   ├── pinyinMatrix.ts
-│   └── radicalVariants.ts
 ├── services/
 ├── types/
 └── App.vue
@@ -178,6 +165,7 @@ src/
 ```bash
 npm install
 npm run audio:web-catalog
+npm run tone-pairs:sync
 npm run radicals:sync
 npm run dev
 ```
@@ -187,13 +175,10 @@ Validação:
 ```bash
 node --check scripts/sync-human-audio.mjs
 node --check scripts/sync-web-audio-catalog.mjs
+node --check scripts/sync-tone-pair-audio.mjs
 node --check scripts/sync-radicals.mjs
+npm audit --audit-level=high
 npm run typecheck
+npm run test:e2e
 npm run build
 ```
-
-## Política de catálogo de áudio
-
-Cada gravação aceita registra metadados como Pinyin, inicial, final, tom, arquivo/URL, fonte, falante, créditos e licença.
-
-O projeto nunca usa TTS ou voz gerada por IA para completar automaticamente uma combinação ausente.
