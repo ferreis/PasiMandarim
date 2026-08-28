@@ -99,6 +99,14 @@ async function fetchJson(url) {
   return response.json()
 }
 
+async function fetchLicensedAudio(sentenceId) {
+  const url = new URL(`https://api.tatoeba.org/v1/sentences/${sentenceId}`)
+  url.searchParams.set('include', 'audios')
+  url.searchParams.set('showtrans', 'none')
+  const payload = await fetchJson(url)
+  return pickAudio(payload.data?.audios)
+}
+
 async function downloadAudio(audioId, destination) {
   if (existsSync(destination)) return
   const url = `https://api.tatoeba.org/v1/audios/${audioId}/file`
@@ -127,8 +135,7 @@ function makeSearchUrl(after = '') {
   url.searchParams.set('trans:lang', 'por')
   url.searchParams.set('showtrans:lang', 'por')
   url.searchParams.set('showtrans:is_unapproved', 'no')
-  url.searchParams.append('include', 'audios')
-  url.searchParams.append('include', 'transcriptions')
+  url.searchParams.set('include', 'transcriptions')
   url.searchParams.set('sort', 'words')
   url.searchParams.set('limit', '100')
   if (after) url.searchParams.set('after', after)
@@ -143,7 +150,7 @@ function extractAfter(nextUrl) {
 async function collectSentences() {
   const accepted = []
   const seenSentenceIds = new Set()
-  const rejected = { fetched: 0, translation: 0, audio: 0, transcription: 0, length: 0, final: 0 }
+  const rejected = { fetched: 0, translation: 0, transcription: 0, length: 0, final: 0, audio: 0 }
   let after = ''
 
   for (let page = 0; page < MAX_PAGES && accepted.length < TARGET_SENTENCES; page += 1) {
@@ -156,9 +163,6 @@ async function collectSentences() {
 
       const translationPt = pickPortugueseTranslation(sentence.translations)
       if (!translationPt) { rejected.translation += 1; continue }
-
-      const audio = pickAudio(sentence.audios)
-      if (!audio) { rejected.audio += 1; continue }
 
       const parsed = parsePinyin(sentence.transcriptions)
       if (!parsed.length) { rejected.transcription += 1; continue }
@@ -175,6 +179,9 @@ async function collectSentences() {
         tone: item.tone,
       }))
       if (syllables.some((item) => !VALID_FINALS.has(item.final))) { rejected.final += 1; continue }
+
+      const audio = await fetchLicensedAudio(sentence.id)
+      if (!audio) { rejected.audio += 1; continue }
 
       accepted.push({
         id: sentence.id,
