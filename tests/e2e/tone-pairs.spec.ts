@@ -92,7 +92,8 @@ test('reproduz a palavra três vezes automaticamente ao iniciar', async ({ page 
   await startAndWaitForAudio(page)
 
   await expect.poll(() => page.evaluate(() => (window as unknown as { __tonePlayCount: number }).__tonePlayCount)).toBe(3)
-  await expect(page.locator('.tone-answer-number').first()).toHaveCSS('font-size', /[3-9][0-9]px/)
+  const size = await page.locator('.tone-answer-number').first().evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize))
+  expect(size).toBeGreaterThanOrEqual(30)
 })
 
 test('treina um par tonal selecionado e salva o resultado no navegador', async ({ page }) => {
@@ -172,7 +173,8 @@ test('permite mostrar a resposta sem contaminar o histórico de desempenho', asy
   await expect(page.locator('.tone-result-boxes').nth(0).locator('span')).toHaveText(['—', '—'])
   await expect(page.locator('.tone-result-boxes').nth(1).locator('span')).toHaveText(['1', '1'])
   await expect(page.locator('.tone-dashboard')).toContainText('1apenas estudadas')
-  await expect(page.evaluate(() => localStorage.getItem('learning-mandarin:tone-pair-attempts:v1'))).resolves.toBeNull()
+  const stored = await page.evaluate(() => localStorage.getItem('learning-mandarin:tone-pair-attempts:v1'))
+  expect(stored).toBeNull()
 })
 
 test('modo estudo automático revela sem exigir resposta do usuário', async ({ page }) => {
@@ -180,13 +182,13 @@ test('modo estudo automático revela sem exigir resposta do usuário', async ({ 
   await mockAudio(page)
   await page.goto('/#/tones')
 
-  const studyOption = page.getByText('Modo estudo automático', { exact: true }).locator('..').locator('input')
-  await studyOption.check()
+  await page.locator('.tone-study-options label').nth(1).locator('input').check()
   await page.getByRole('button', { name: 'Iniciar treino' }).click()
 
   await expect(page.getByRole('button', { name: 'Parar modo automático' })).toBeVisible()
   await expect(page.getByText('Resposta revelada.', { exact: true })).toBeVisible({ timeout: 4_000 })
-  await expect(page.evaluate(() => localStorage.getItem('learning-mandarin:tone-pair-attempts:v1'))).resolves.toBeNull()
+  const stored = await page.evaluate(() => localStorage.getItem('learning-mandarin:tone-pair-attempts:v1'))
+  expect(stored).toBeNull()
   await page.getByRole('button', { name: 'Parar modo automático' }).click()
   await expect(page.getByRole('alert')).toContainText('Modo automático interrompido')
 })
