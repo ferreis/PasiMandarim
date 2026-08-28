@@ -21,6 +21,13 @@ const audioSources = [
     license: 'CC BY-NC-SA 2.5',
     sourceUrl: 'https://www.sinosplice.com/learn-chinese/tone-pair-drills',
   },
+  {
+    name: 'Tatoeba — frases em mandarim',
+    speaker: 'Diversos colaboradores humanos',
+    description: 'Frases usadas no treino de iniciais, finais e tons. Cada frase exibe o autor e a licença específica da gravação.',
+    license: 'Somente áudios com licença explícita reutilizável',
+    sourceUrl: 'https://tatoeba.org/pt-br/audio/index/cmn',
+  },
 ]
 </script>
 
