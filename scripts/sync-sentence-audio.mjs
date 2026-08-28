@@ -129,6 +129,7 @@ function makeSearchUrl(after = '') {
   url.searchParams.set('showtrans:lang', 'por')
   url.searchParams.set('showtrans:is_unapproved', 'no')
   url.searchParams.set('include', 'audios,transcriptions')
+  url.searchParams.set('sort', 'words')
   url.searchParams.set('limit', '100')
   if (after) url.searchParams.set('after', after)
   return url
