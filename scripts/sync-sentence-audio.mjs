@@ -21,9 +21,8 @@ const ZERO_INITIAL_MAP = [
 ]
 
 function reusableLicense(license = '') {
-  const normalized = license.toUpperCase()
-  if (normalized.startsWith('CC0')) return true
-  return normalized.startsWith('CC BY') && !normalized.includes('-NC') && !normalized.includes('-ND')
+  const normalized = String(license).trim().toUpperCase()
+  return normalized.startsWith('CC0') || normalized.startsWith('CC ')
 }
 
 function normalizeNumberedSyllable(value) {
@@ -143,6 +142,7 @@ function extractAfter(nextUrl) {
 async function collectSentences() {
   const accepted = []
   const seenSentenceIds = new Set()
+  const rejected = { fetched: 0, translation: 0, audio: 0, transcription: 0, length: 0, final: 0 }
   let after = ''
 
   for (let page = 0; page < MAX_PAGES && accepted.length < TARGET_SENTENCES; page += 1) {
@@ -151,12 +151,19 @@ async function collectSentences() {
       if (accepted.length >= TARGET_SENTENCES) break
       if (!sentence?.id || seenSentenceIds.has(sentence.id)) continue
       seenSentenceIds.add(sentence.id)
+      rejected.fetched += 1
 
       const translationPt = pickPortugueseTranslation(sentence.translations)
-      const parsed = parsePinyin(sentence.transcriptions)
-      const hanzi = chineseCharacters(sentence.text ?? '')
+      if (!translationPt) { rejected.translation += 1; continue }
+
       const audio = pickAudio(sentence.audios)
-      if (!translationPt || !audio || parsed.length < 3 || parsed.length > 8 || parsed.length !== hanzi.length) continue
+      if (!audio) { rejected.audio += 1; continue }
+
+      const parsed = parsePinyin(sentence.transcriptions)
+      if (!parsed.length) { rejected.transcription += 1; continue }
+
+      const hanzi = chineseCharacters(sentence.text ?? '')
+      if (parsed.length < 3 || parsed.length > 8 || parsed.length !== hanzi.length) { rejected.length += 1; continue }
 
       const syllables = parsed.map((item, index) => ({
         hanzi: hanzi[index],
@@ -166,7 +173,7 @@ async function collectSentences() {
         final: item.final,
         tone: item.tone,
       }))
-      if (syllables.some((item) => !VALID_FINALS.has(item.final))) continue
+      if (syllables.some((item) => !VALID_FINALS.has(item.final))) { rejected.final += 1; continue }
 
       accepted.push({
         id: sentence.id,
@@ -189,6 +196,7 @@ async function collectSentences() {
     after = extractAfter(payload.paging.next)
     if (!after) break
   }
+  console.log(`Triagem Tatoeba: ${JSON.stringify(rejected)}; aceitas=${accepted.length}.`)
   return accepted
 }
 
