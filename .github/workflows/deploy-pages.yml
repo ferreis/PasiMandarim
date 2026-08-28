@@ -38,6 +38,9 @@ jobs:
       - name: Baixar áudios humanos dos pares tonais
         run: npm run tone-pairs:sync
 
+      - name: Baixar frases humanas para treino auditivo
+        run: npm run phrases:sync
+
       - name: Gerar catálogo de radicais
         run: npm run radicals:sync
 
