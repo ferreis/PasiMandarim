@@ -24,6 +24,19 @@ test('atualiza a explicação e o diagrama quando a inicial muda', async ({ page
   await expect(guideQ).toContainText('Rajada de ar')
 })
 
+test('usa diagramas grandes e legíveis em desktop', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await page.goto('/#/comparison')
+
+  const diagram = page.locator('[data-initial="b"] .tongue-diagram svg')
+  await expect(diagram).toBeVisible()
+
+  const box = await diagram.boundingBox()
+  expect(box).not.toBeNull()
+  expect(box?.width ?? 0).toBeGreaterThan(500)
+  expect(box?.height ?? 0).toBeGreaterThan(275)
+})
+
 test('mostra o contraste retroflexo sem reutilizar HTML do deck Anki', async ({ page }) => {
   await page.goto('/#/comparison')
 
