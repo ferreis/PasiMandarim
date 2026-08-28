@@ -31,6 +31,7 @@ jobs:
           node --check scripts/sync-human-audio.mjs
           node --check scripts/sync-web-audio-catalog.mjs
           node --check scripts/sync-tone-pair-audio.mjs
+          node --check scripts/sync-sentence-audio.mjs
           node --check scripts/sync-radicals.mjs
 
       - name: Gerar catálogo web de áudio humano
@@ -38,6 +39,9 @@ jobs:
 
       - name: Baixar áudios humanos dos pares tonais
         run: npm run tone-pairs:sync
+
+      - name: Baixar frases humanas para treino auditivo
+        run: npm run phrases:sync
 
       - name: Gerar catálogo de radicais
         run: npm run radicals:sync
