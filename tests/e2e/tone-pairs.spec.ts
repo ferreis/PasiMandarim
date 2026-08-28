@@ -96,6 +96,30 @@ test('reproduz a palavra três vezes automaticamente ao iniciar', async ({ page 
   expect(size).toBeGreaterThanOrEqual(30)
 })
 
+test('mantém as opções de reprodução editáveis durante a sessão', async ({ page }) => {
+  await mockAudio(page)
+  await page.goto('/#/tones')
+  await startAndWaitForAudio(page)
+
+  const autoRepeat = page.locator('.tone-study-options input').nth(0)
+  const studyMode = page.locator('.tone-study-options input').nth(1)
+
+  await expect(autoRepeat).toBeEnabled()
+  await expect(studyMode).toBeEnabled()
+
+  await autoRepeat.uncheck()
+  await expect(autoRepeat).not.toBeChecked()
+
+  await studyMode.check()
+  await expect(studyMode).toBeChecked()
+  await expect(page.getByRole('button', { name: 'Parar modo automático' })).toBeVisible()
+
+  await studyMode.uncheck()
+  await expect(studyMode).not.toBeChecked()
+  await expect(page.getByRole('button', { name: 'Parar modo automático' })).toBeHidden()
+  await expect(page.getByRole('alert')).toContainText('Modo automático desativado')
+})
+
 test('treina um par tonal selecionado e salva o resultado no navegador', async ({ page }) => {
   await mockAudio(page)
   await page.goto('/#/tones')
