@@ -8,7 +8,6 @@ const OUTPUT_DIR = path.join(ROOT, 'public', 'audio', 'tatoeba')
 const CATALOG_PATH = path.join(ROOT, 'src', 'data', 'generatedSentenceCatalog.ts')
 const TARGET_SENTENCES = 30
 const MAX_PAGES = 8
-const DETAIL_BATCH_SIZE = 8
 const MAX_AUDIO_BYTES = 5 * 1024 * 1024
 const ALLOWED_AUDIO_HOSTS = new Set(['api.tatoeba.org', 'tatoeba.org', 'www.tatoeba.org', 'audio.tatoeba.org'])
 const VALID_FINALS = new Set([
@@ -20,6 +19,10 @@ const ZERO_INITIAL_MAP = [
   ['yong','iong'],['ying','ing'],['yang','iang'],['yuan','üan'],['yue','üe'],['you','iu'],['yao','iao'],['yan','ian'],['yin','in'],['yun','ün'],['ye','ie'],['yi','i'],['yu','ü'],['ya','ia'],
   ['weng','ueng'],['wang','uang'],['wen','un'],['wei','ui'],['wai','uai'],['wan','uan'],['wu','u'],['wo','uo'],['wa','ua'],
 ]
+
+function audioLicense(audio) {
+  return String(audio?.license ?? audio?.licence ?? '').trim()
+}
 
 function reusableLicense(license = '') {
   const normalized = String(license).trim().toUpperCase()
@@ -91,21 +94,13 @@ function pickPortugueseTranslation(translations = []) {
 }
 
 function pickAudio(audios = []) {
-  return audios.find((audio) => audio?.id && reusableLicense(audio.licence)) ?? null
+  return audios.find((audio) => audio?.id && reusableLicense(audioLicense(audio))) ?? null
 }
 
 async function fetchJson(url) {
   const response = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'learning-mandarin-static-sync/1.0' } })
   if (!response.ok) throw new Error(`Tatoeba API ${response.status}: ${url}`)
   return response.json()
-}
-
-async function fetchLicensedAudio(sentenceId) {
-  const url = new URL(`https://api.tatoeba.org/v1/sentences/${sentenceId}`)
-  url.searchParams.set('include', 'audios')
-  url.searchParams.set('showtrans', 'none')
-  const payload = await fetchJson(url)
-  return pickAudio(payload.data?.audios)
 }
 
 async function downloadAudio(audioId, destination) {
@@ -136,7 +131,7 @@ function makeSearchUrl(after = '') {
   url.searchParams.set('trans:lang', 'por')
   url.searchParams.set('showtrans:lang', 'por')
   url.searchParams.set('showtrans:is_unapproved', 'no')
-  url.searchParams.set('include', 'transcriptions')
+  url.searchParams.set('include', 'audios,transcriptions')
   url.searchParams.set('sort', 'words')
   url.searchParams.set('limit', '100')
   if (after) url.searchParams.set('after', after)
@@ -156,9 +151,9 @@ async function collectSentences() {
 
   for (let page = 0; page < MAX_PAGES && accepted.length < TARGET_SENTENCES; page += 1) {
     const payload = await fetchJson(makeSearchUrl(after))
-    const eligible = []
 
     for (const sentence of payload.data ?? []) {
+      if (accepted.length >= TARGET_SENTENCES) break
       if (!sentence?.id || seenSentenceIds.has(sentence.id)) continue
       seenSentenceIds.add(sentence.id)
       rejected.fetched += 1
@@ -182,33 +177,26 @@ async function collectSentences() {
       }))
       if (syllables.some((item) => !VALID_FINALS.has(item.final))) { rejected.final += 1; continue }
 
-      eligible.push({ sentence, translationPt, syllables })
-    }
+      const audio = pickAudio(sentence.audios)
+      if (!audio) { rejected.audio += 1; continue }
+      const license = audioLicense(audio)
 
-    for (let index = 0; index < eligible.length && accepted.length < TARGET_SENTENCES; index += DETAIL_BATCH_SIZE) {
-      const batch = eligible.slice(index, index + DETAIL_BATCH_SIZE)
-      const audios = await Promise.all(batch.map(({ sentence }) => fetchLicensedAudio(sentence.id)))
-      for (let offset = 0; offset < batch.length && accepted.length < TARGET_SENTENCES; offset += 1) {
-        const { sentence, translationPt, syllables } = batch[offset]
-        const audio = audios[offset]
-        if (!audio) { rejected.audio += 1; continue }
-        accepted.push({
-          id: sentence.id,
-          text: sentence.text,
-          translationPt,
-          pinyin: syllables.map((item) => item.pinyin).join(' '),
-          syllables,
-          audio: {
-            id: audio.id,
-            path: `/audio/tatoeba/${audio.id}.mp3`,
-            author: audio.author,
-            license: audio.licence,
-            attributionUrl: audio.attribution_url || `https://tatoeba.org/users/profile/${encodeURIComponent(audio.author)}`,
-          },
-          sourceUrl: `https://tatoeba.org/pt-br/sentences/show/${sentence.id}`,
-          textLicense: sentence.license,
-        })
-      }
+      accepted.push({
+        id: sentence.id,
+        text: sentence.text,
+        translationPt,
+        pinyin: syllables.map((item) => item.pinyin).join(' '),
+        syllables,
+        audio: {
+          id: audio.id,
+          path: `/audio/tatoeba/${audio.id}.mp3`,
+          author: audio.author,
+          license,
+          attributionUrl: audio.attribution_url || audio.author_url || `https://tatoeba.org/users/profile/${encodeURIComponent(audio.author)}`,
+        },
+        sourceUrl: `https://tatoeba.org/pt-br/sentences/show/${sentence.id}`,
+        textLicense: sentence.license,
+      })
     }
 
     if (!payload.paging?.has_next) break
