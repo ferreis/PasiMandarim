@@ -42,7 +42,20 @@ const AUTO_REPETITIONS = 3
 const STUDY_PAUSE_MS = 2000
 
 watch(studyMode, (enabled) => {
-  if (enabled) autoRepeat.value = true
+  if (!sessionActive.value) return
+
+  if (enabled) {
+    cancelAutomation()
+    window.setTimeout(() => {
+      if (studyMode.value && sessionActive.value) void runStudyMode()
+    }, 0)
+    return
+  }
+
+  if (studyRunning.value) {
+    cancelAutomation()
+    audioError.value = 'Modo automático desativado. Você pode continuar esta sessão manualmente.'
+  }
 })
 
 function toneLabel(tone: ToneNumber): string {
@@ -360,12 +373,12 @@ onBeforeUnmount(cancelAutomation)
 
       <div class="tone-study-options" aria-label="Opções de reprodução">
         <label>
-          <input v-model="autoRepeat" type="checkbox" :disabled="sessionActive || studyMode" />
-          <span><strong>Reproduzir 3× automaticamente</strong><small>Ao iniciar, avançar e revelar a resposta.</small></span>
+          <input v-model="autoRepeat" type="checkbox" />
+          <span><strong>Reproduzir 3× automaticamente</strong><small>No modo manual: ao iniciar, avançar e revelar a resposta.</small></span>
         </label>
         <label>
-          <input v-model="studyMode" type="checkbox" :disabled="sessionActive" />
-          <span><strong>Modo estudo automático</strong><small>3× áudio → 2s → resposta → 2s → 3× áudio → 2s → próxima.</small></span>
+          <input v-model="studyMode" type="checkbox" />
+          <span><strong>Modo estudo automático</strong><small>Pode ser ligado ou desligado durante a sessão: 3× áudio → 2s → resposta → 2s → 3× áudio → 2s → próxima.</small></span>
         </label>
       </div>
 
