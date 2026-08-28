@@ -4,6 +4,7 @@ import './style.css'
 import './flashcards.css'
 import './tone-pairs.css'
 import './tone-symbols.css'
+import './tone-study-mode.css'
 import './pronunciation.css'
 import './layout.css'
 

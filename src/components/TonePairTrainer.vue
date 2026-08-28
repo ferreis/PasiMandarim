@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { tonePairKey, tonePairWords } from '../data/tonePairCatalog'
 import { toneDisplay } from '../data/toneDisplay'
-import { playTonePairWord } from '../services/tonePairAudio'
+import { playTonePairWord, stopTonePairAudio } from '../services/tonePairAudio'
 import { clearTonePairAttempts, loadTonePairAttempts, saveTonePairAttempt } from '../services/tonePairStats'
 import type { ToneNumber, TonePairAttempt, TonePairWord } from '../types/tonePair'
 
@@ -16,11 +16,14 @@ const quantityOptions = [10, 20, 40]
 const selectedFirstTones = ref<FirstTone[]>([1, 2, 3, 4])
 const selectedSecondTones = ref<ToneNumber[]>([1, 2, 3, 4, 5])
 const requestedCards = ref(20)
+const autoRepeat = ref(true)
+const studyMode = ref(false)
 const questions = ref<TonePairWord[]>([])
 const currentIndex = ref(0)
 const answerTone1 = ref<FirstTone | null>(null)
 const answerTone2 = ref<ToneNumber | null>(null)
 const answered = ref(false)
+const revealedOnly = ref(false)
 const hasPlayed = ref(false)
 const audioLoading = ref(false)
 const audioError = ref('')
@@ -29,7 +32,18 @@ const sessionFinished = ref(false)
 const sessionCorrect = ref(0)
 const sessionPartial = ref(0)
 const sessionErrors = ref(0)
+const sessionStudied = ref(0)
+const studyRunning = ref(false)
+const automationStatus = ref('')
 const attempts = ref<TonePairAttempt[]>(loadTonePairAttempts())
+
+let automationGeneration = 0
+const AUTO_REPETITIONS = 3
+const STUDY_PAUSE_MS = 2000
+
+watch(studyMode, (enabled) => {
+  if (enabled) autoRepeat.value = true
+})
 
 function toneLabel(tone: ToneNumber): string {
   return toneDisplay[tone].label
@@ -55,6 +69,12 @@ function shuffle<T>(items: T[]): T[] {
     ;[result[i], result[j]] = [result[j], result[i]]
   }
   return result
+}
+
+function wait(milliseconds: number, generation: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    window.setTimeout(() => resolve(generation === automationGeneration), milliseconds)
+  })
 }
 
 const activeFirstToneOptions = computed(() =>
@@ -86,16 +106,22 @@ function buildQuestionSet(count: number): TonePairWord[] {
 const currentQuestion = computed(() => questions.value[currentIndex.value])
 const answeredCount = computed(() => sessionCorrect.value + sessionPartial.value + sessionErrors.value)
 const sessionAccuracy = computed(() => answeredCount.value ? Math.round(sessionCorrect.value / answeredCount.value * 100) : 0)
+const scoredAnswer = computed(() => answered.value && !revealedOnly.value)
 const firstToneIsCorrect = computed(() => Boolean(
-  answered.value && currentQuestion.value && answerTone1.value === currentQuestion.value.tone1,
+  scoredAnswer.value && currentQuestion.value && answerTone1.value === currentQuestion.value.tone1,
 ))
 const secondToneIsCorrect = computed(() => Boolean(
-  answered.value && currentQuestion.value && answerTone2.value === currentQuestion.value.tone2,
+  scoredAnswer.value && currentQuestion.value && answerTone2.value === currentQuestion.value.tone2,
 ))
-const answerIsCorrect = computed(() => firstToneIsCorrect.value && secondToneIsCorrect.value)
-const answerIsPartial = computed(() => answered.value && firstToneIsCorrect.value !== secondToneIsCorrect.value)
-const resultState = computed(() => answerIsCorrect.value ? 'correct' : answerIsPartial.value ? 'partial' : 'wrong')
-const resultHeadline = computed(() => answerIsCorrect.value ? 'Correto.' : answerIsPartial.value ? 'Parcialmente correto.' : 'Incorreto.')
+const answerIsCorrect = computed(() => scoredAnswer.value && firstToneIsCorrect.value && secondToneIsCorrect.value)
+const answerIsPartial = computed(() => scoredAnswer.value && firstToneIsCorrect.value !== secondToneIsCorrect.value)
+const resultState = computed(() => revealedOnly.value ? 'study' : answerIsCorrect.value ? 'correct' : answerIsPartial.value ? 'partial' : 'wrong')
+const resultHeadline = computed(() => {
+  if (revealedOnly.value) return 'Resposta revelada.'
+  if (answerIsCorrect.value) return 'Correto.'
+  if (answerIsPartial.value) return 'Parcialmente correto.'
+  return 'Incorreto.'
+})
 const partialMessage = computed(() => {
   if (!answerIsPartial.value) return ''
   return firstToneIsCorrect.value ? 'Você acertou o tom da 1ª sílaba.' : 'Você acertou o tom da 2ª sílaba.'
@@ -137,28 +163,28 @@ const worstPairs = computed<PairErrorSummary[]>(() => {
   })).filter((item) => item.errors > 0).sort((a, b) => b.errors - a.errors || b.errorRate - a.errorRate).slice(0, 6)
 })
 
-function startSession(): void {
-  if (!candidates.value.length) return
-  questions.value = buildQuestionSet(requestedCards.value)
-  currentIndex.value = 0
+function resetQuestionState(): void {
   answerTone1.value = null
   answerTone2.value = null
   answered.value = false
+  revealedOnly.value = false
   hasPlayed.value = false
   audioError.value = ''
-  sessionCorrect.value = 0
-  sessionPartial.value = 0
-  sessionErrors.value = 0
-  sessionFinished.value = false
-  sessionActive.value = true
 }
 
-async function playCurrent(): Promise<void> {
-  if (!currentQuestion.value) return
+function cancelAutomation(): void {
+  automationGeneration += 1
+  studyRunning.value = false
+  automationStatus.value = ''
+  stopTonePairAudio()
+}
+
+async function playCurrent(repetitions = autoRepeat.value ? AUTO_REPETITIONS : 1): Promise<void> {
+  if (!currentQuestion.value || audioLoading.value) return
   audioLoading.value = true
   audioError.value = ''
   try {
-    await playTonePairWord(currentQuestion.value)
+    await playTonePairWord(currentQuestion.value, repetitions)
     hasPlayed.value = true
   } catch {
     audioError.value = 'Não foi possível reproduzir esta gravação humana.'
@@ -167,14 +193,46 @@ async function playCurrent(): Promise<void> {
   }
 }
 
-function confirmAnswer(): void {
+function moveToNextQuestion(): boolean {
+  if (currentIndex.value >= questions.value.length - 1) {
+    sessionActive.value = false
+    sessionFinished.value = true
+    studyRunning.value = false
+    automationStatus.value = ''
+    return false
+  }
+  currentIndex.value += 1
+  resetQuestionState()
+  return true
+}
+
+async function startSession(): Promise<void> {
+  if (!candidates.value.length) return
+  cancelAutomation()
+  questions.value = buildQuestionSet(requestedCards.value)
+  currentIndex.value = 0
+  resetQuestionState()
+  sessionCorrect.value = 0
+  sessionPartial.value = 0
+  sessionErrors.value = 0
+  sessionStudied.value = 0
+  sessionFinished.value = false
+  sessionActive.value = true
+
+  if (studyMode.value) {
+    void runStudyMode()
+  } else if (autoRepeat.value) {
+    await playCurrent(AUTO_REPETITIONS)
+  }
+}
+
+function saveScoredAnswer(): void {
   const question = currentQuestion.value
-  if (!question || !hasPlayed.value || answered.value || !answerTone1.value || !answerTone2.value) return
+  if (!question || !answerTone1.value || !answerTone2.value) return
 
   const tone1Correct = answerTone1.value === question.tone1
   const tone2Correct = answerTone2.value === question.tone2
   const correct = tone1Correct && tone2Correct
-  answered.value = true
 
   if (correct) sessionCorrect.value += 1
   else if (tone1Correct !== tone2Correct) sessionPartial.value += 1
@@ -193,24 +251,73 @@ function confirmAnswer(): void {
   })
 }
 
-function nextQuestion(): void {
+function confirmAnswer(): void {
+  if (!currentQuestion.value || !hasPlayed.value || answered.value || !answerTone1.value || !answerTone2.value) return
+  revealedOnly.value = false
+  answered.value = true
+  saveScoredAnswer()
+  if (autoRepeat.value) void playCurrent(AUTO_REPETITIONS)
+}
+
+function revealAnswer(replay = true): void {
+  if (!currentQuestion.value || !hasPlayed.value || answered.value) return
+  revealedOnly.value = true
+  answered.value = true
+  sessionStudied.value += 1
+  if (replay && autoRepeat.value) void playCurrent(AUTO_REPETITIONS)
+}
+
+async function nextQuestion(): Promise<void> {
   if (!answered.value) return
-  if (currentIndex.value >= questions.value.length - 1) {
-    sessionActive.value = false
-    sessionFinished.value = true
-    return
+  cancelAutomation()
+  if (!moveToNextQuestion()) return
+  if (autoRepeat.value) await playCurrent(AUTO_REPETITIONS)
+}
+
+async function runStudyMode(): Promise<void> {
+  const generation = ++automationGeneration
+  studyRunning.value = true
+
+  while (sessionActive.value && studyMode.value && generation === automationGeneration) {
+    resetQuestionState()
+    automationStatus.value = 'Ouvindo a palavra 3 vezes…'
+    await playCurrent(AUTO_REPETITIONS)
+    if (generation !== automationGeneration || !sessionActive.value) break
+
+    automationStatus.value = 'Pausa de 2 segundos antes da resposta…'
+    if (!await wait(STUDY_PAUSE_MS, generation)) break
+
+    revealAnswer(false)
+    automationStatus.value = 'Resposta exibida. Repetindo em 2 segundos…'
+    if (!await wait(STUDY_PAUSE_MS, generation)) break
+
+    automationStatus.value = 'Ouvindo novamente 3 vezes…'
+    await playCurrent(AUTO_REPETITIONS)
+    if (generation !== automationGeneration || !sessionActive.value) break
+
+    automationStatus.value = 'Próxima palavra em 2 segundos…'
+    if (!await wait(STUDY_PAUSE_MS, generation)) break
+
+    if (!moveToNextQuestion()) break
   }
-  currentIndex.value += 1
-  answerTone1.value = null
-  answerTone2.value = null
-  answered.value = false
-  hasPlayed.value = false
-  audioError.value = ''
+
+  if (generation === automationGeneration) {
+    studyRunning.value = false
+    automationStatus.value = ''
+  }
+}
+
+function stopStudyMode(): void {
+  cancelAutomation()
+  studyMode.value = false
+  audioError.value = 'Modo automático interrompido. Você pode continuar esta sessão manualmente.'
 }
 
 function resetHistory(): void {
   if (!sessionActive.value) attempts.value = clearTonePairAttempts()
 }
+
+onBeforeUnmount(cancelAutomation)
 </script>
 
 <template>
@@ -229,7 +336,8 @@ function resetHistory(): void {
             <label v-for="tone in firstToneOptions" :key="tone">
               <input v-model="selectedFirstTones" type="checkbox" :value="tone" :disabled="sessionActive" />
               <span class="tone-option-content">
-                <strong class="tone-symbol">{{ toneDisplay[tone].symbol }}</strong>
+                <strong class="tone-number">{{ tone }}</strong>
+                <b class="tone-symbol">{{ toneDisplay[tone].symbol }}</b>
                 <small>{{ toneDisplay[tone].shortLabel }}</small>
               </span>
             </label>
@@ -241,12 +349,24 @@ function resetHistory(): void {
             <label v-for="tone in secondToneOptions" :key="tone">
               <input v-model="selectedSecondTones" type="checkbox" :value="tone" :disabled="sessionActive" />
               <span class="tone-option-content">
-                <strong class="tone-symbol">{{ toneDisplay[tone].symbol }}</strong>
+                <strong class="tone-number">{{ tone }}</strong>
+                <b class="tone-symbol">{{ toneDisplay[tone].symbol }}</b>
                 <small>{{ toneDisplay[tone].shortLabel }}</small>
               </span>
             </label>
           </div>
         </fieldset>
+      </div>
+
+      <div class="tone-study-options" aria-label="Opções de reprodução">
+        <label>
+          <input v-model="autoRepeat" type="checkbox" :disabled="sessionActive || studyMode" />
+          <span><strong>Reproduzir 3× automaticamente</strong><small>Ao iniciar, avançar e revelar a resposta.</small></span>
+        </label>
+        <label>
+          <input v-model="studyMode" type="checkbox" :disabled="sessionActive" />
+          <span><strong>Modo estudo automático</strong><small>3× áudio → 2s → resposta → 2s → 3× áudio → 2s → próxima.</small></span>
+        </label>
       </div>
 
       <div class="tone-session-row">
@@ -263,12 +383,14 @@ function resetHistory(): void {
           <h2 v-if="!answered">Ouça a palavra sem olhar a resposta</h2>
           <h2 v-else class="revealed-word">{{ currentQuestion.hanzi }}</h2>
           <p v-if="answered" class="revealed-pinyin">{{ currentQuestion.pinyin }} · {{ currentQuestion.meaningPt }}</p>
-          <button class="tone-player" type="button" @click="playCurrent">{{ audioLoading ? 'Carregando…' : hasPlayed ? '▶ Ouvir novamente' : '▶ Ouvir palavra' }}</button>
-          <p v-if="!hasPlayed" class="tone-hint">As respostas são liberadas depois que você ouvir o áudio.</p>
+          <button class="tone-player" type="button" :disabled="audioLoading || studyRunning" @click="playCurrent()">{{ audioLoading ? 'Reproduzindo…' : hasPlayed ? '▶ Ouvir novamente' : '▶ Ouvir palavra' }}</button>
+          <p v-if="automationStatus" class="automation-status" role="status">{{ automationStatus }}</p>
+          <button v-if="studyRunning" class="stop-study-button" type="button" @click="stopStudyMode">Parar modo automático</button>
+          <p v-if="!hasPlayed && !studyRunning" class="tone-hint">As respostas são liberadas depois que você ouvir o áudio.</p>
         </div>
 
-        <div class="tone-answer-grid" :class="{ locked: !hasPlayed }">
-          <fieldset :class="{ 'syllable-correct': answered && firstToneIsCorrect, 'syllable-wrong': answered && !firstToneIsCorrect }">
+        <div v-if="!studyMode || !studyRunning" class="tone-answer-grid" :class="{ locked: !hasPlayed }">
+          <fieldset :class="{ 'syllable-correct': scoredAnswer && firstToneIsCorrect, 'syllable-wrong': scoredAnswer && !firstToneIsCorrect }">
             <legend>Tom da 1ª sílaba?</legend>
             <div class="tone-answer-buttons" :style="{ gridTemplateColumns: `repeat(${activeFirstToneOptions.length}, minmax(0, 1fr))` }">
               <button
@@ -279,16 +401,17 @@ function resetHistory(): void {
                 :disabled="!hasPlayed || answered"
                 :class="{
                   selected: !answered && answerTone1 === tone,
-                  'answer-correct': answered && tone === currentQuestion.tone1,
-                  'answer-wrong': answered && answerTone1 === tone && tone !== currentQuestion.tone1,
+                  'answer-correct': scoredAnswer && tone === currentQuestion.tone1,
+                  'answer-wrong': scoredAnswer && answerTone1 === tone && tone !== currentQuestion.tone1,
                 }"
                 @click="answerTone1 = tone"
               >
-                <strong class="tone-symbol">{{ toneDisplay[tone].symbol }}</strong><span>{{ toneDisplay[tone].shortLabel }}</span>
+                <strong class="tone-answer-number">{{ tone }}</strong>
+                <span>{{ toneDisplay[tone].symbol }} {{ toneDisplay[tone].shortLabel }}</span>
               </button>
             </div>
           </fieldset>
-          <fieldset :class="{ 'syllable-correct': answered && secondToneIsCorrect, 'syllable-wrong': answered && !secondToneIsCorrect }">
+          <fieldset :class="{ 'syllable-correct': scoredAnswer && secondToneIsCorrect, 'syllable-wrong': scoredAnswer && !secondToneIsCorrect }">
             <legend>Tom da 2ª sílaba?</legend>
             <div class="tone-answer-buttons" :style="{ gridTemplateColumns: `repeat(${activeSecondToneOptions.length}, minmax(0, 1fr))` }">
               <button
@@ -299,26 +422,51 @@ function resetHistory(): void {
                 :disabled="!hasPlayed || answered"
                 :class="{
                   selected: !answered && answerTone2 === tone,
-                  'answer-correct': answered && tone === currentQuestion.tone2,
-                  'answer-wrong': answered && answerTone2 === tone && tone !== currentQuestion.tone2,
+                  'answer-correct': scoredAnswer && tone === currentQuestion.tone2,
+                  'answer-wrong': scoredAnswer && answerTone2 === tone && tone !== currentQuestion.tone2,
                 }"
                 @click="answerTone2 = tone"
               >
-                <strong class="tone-symbol">{{ toneDisplay[tone].symbol }}</strong><span>{{ toneDisplay[tone].shortLabel }}</span>
+                <strong class="tone-answer-number">{{ tone }}</strong>
+                <span>{{ toneDisplay[tone].symbol }} {{ toneDisplay[tone].shortLabel }}</span>
               </button>
             </div>
           </fieldset>
         </div>
-        <button v-if="!answered" class="confirm-tone-answer" type="button" :disabled="!hasPlayed || !answerTone1 || !answerTone2" @click="confirmAnswer">Confirmar resposta</button>
 
-        <div v-else class="tone-result" :class="resultState" role="status">
+        <div v-if="!answered && (!studyMode || !studyRunning)" class="tone-question-actions">
+          <button class="confirm-tone-answer" type="button" :disabled="!hasPlayed || !answerTone1 || !answerTone2" @click="confirmAnswer">Confirmar resposta</button>
+          <button class="reveal-tone-answer" type="button" :disabled="!hasPlayed" @click="revealAnswer()">Mostrar resposta</button>
+        </div>
+
+        <div v-if="answered" class="tone-result" :class="resultState" role="status">
           <div>
             <strong>{{ resultHeadline }}</strong>
             <span v-if="answerIsPartial">{{ partialMessage }}</span>
+            <span v-if="revealedOnly">Esta palavra foi estudada sem registrar acerto ou erro.</span>
             <span>O par correto é <b>{{ currentQuestion.tone1 }}–{{ currentQuestion.tone2 }}</b>: {{ toneDisplay[currentQuestion.tone1].symbol }} {{ toneLabel(currentQuestion.tone1) }} + {{ toneDisplay[currentQuestion.tone2].symbol }} {{ toneLabel(currentQuestion.tone2) }}.</span>
           </div>
 
-          <div class="syllable-feedback-grid">
+          <div class="tone-answer-comparison" aria-label="Comparação visual da resposta">
+            <section>
+              <h3>Sua resposta</h3>
+              <div class="tone-result-boxes">
+                <span :class="scoredAnswer ? (firstToneIsCorrect ? 'correct' : 'wrong') : 'empty'">{{ answerTone1 ?? '—' }}</span>
+                <span :class="scoredAnswer ? (secondToneIsCorrect ? 'correct' : 'wrong') : 'empty'">{{ answerTone2 ?? '—' }}</span>
+              </div>
+              <small>{{ revealedOnly ? 'Resposta não informada.' : '1ª e 2ª sílaba.' }}</small>
+            </section>
+            <section>
+              <h3>Resposta correta</h3>
+              <div class="tone-result-boxes">
+                <span class="correct">{{ currentQuestion.tone1 }}</span>
+                <span class="correct">{{ currentQuestion.tone2 }}</span>
+              </div>
+              <small>{{ toneDisplay[currentQuestion.tone1].symbol }} {{ toneLabel(currentQuestion.tone1) }} · {{ toneDisplay[currentQuestion.tone2].symbol }} {{ toneLabel(currentQuestion.tone2) }}</small>
+            </section>
+          </div>
+
+          <div v-if="scoredAnswer" class="syllable-feedback-grid">
             <article :class="firstToneIsCorrect ? 'correct' : 'wrong'">
               <strong>1ª sílaba</strong>
               <span>Sua resposta: {{ displayAnswer(answerTone1) }}</span>
@@ -332,15 +480,17 @@ function resetHistory(): void {
           </div>
 
           <p v-if="currentQuestion.tone1 === 3 && currentQuestion.tone2 === 3" class="sandhi-note"><b>Regra especial 3–3:</b> na fala contínua, o primeiro 3º tom normalmente sofre sandhi e é realizado com contorno semelhante ao 2º. A resposta mostra os tons lexicais.</p>
-          <button type="button" @click="nextQuestion">{{ currentIndex === questions.length - 1 ? 'Finalizar sessão' : 'Próxima palavra' }}</button>
+          <button v-if="!studyRunning" type="button" @click="nextQuestion">{{ currentIndex === questions.length - 1 ? 'Finalizar sessão' : 'Próxima palavra' }}</button>
         </div>
         <p v-if="audioError" class="audio-error" role="alert">{{ audioError }}</p>
       </div>
 
       <div v-if="sessionFinished" class="session-finished tone-session-finished">
         <p class="eyebrow">Sessão concluída</p>
-        <h2>{{ sessionCorrect }} pares totalmente corretos em {{ questions.length }}</h2>
-        <p>{{ sessionPartial }} respostas parciais e {{ sessionErrors }} respostas totalmente incorretas. Precisão de pares: {{ sessionAccuracy }}%. O histórico foi salvo somente neste navegador.</p>
+        <h2 v-if="answeredCount">{{ sessionCorrect }} pares totalmente corretos em {{ answeredCount }} respostas</h2>
+        <h2 v-else>{{ sessionStudied }} palavras estudadas sem pontuação</h2>
+        <p v-if="answeredCount">{{ sessionPartial }} respostas parciais e {{ sessionErrors }} respostas totalmente incorretas. Precisão de pares: {{ sessionAccuracy }}%. {{ sessionStudied ? `${sessionStudied} palavras também foram apenas reveladas.` : '' }} O histórico foi salvo somente neste navegador.</p>
+        <p v-else>O modo estudo não altera seu histórico de acertos e erros.</p>
         <button class="primary-action" type="button" @click="startSession">Treinar novamente</button>
       </div>
 
@@ -358,6 +508,7 @@ function resetHistory(): void {
           <article><strong>{{ sessionCorrect }}</strong><span>acertos</span></article>
           <article><strong>{{ sessionPartial }}</strong><span>parciais</span></article>
           <article><strong>{{ sessionErrors }}</strong><span>erros completos</span></article>
+          <article><strong>{{ sessionStudied }}</strong><span>apenas estudadas</span></article>
           <article><strong>{{ sessionAccuracy }}%</strong><span>precisão do par</span></article>
         </div>
       </section>
@@ -372,7 +523,7 @@ function resetHistory(): void {
       </section>
       <section class="dashboard-section">
         <h3>Acerto por posição</h3>
-        <p v-if="!detailedAttempts.length" class="dashboard-empty">As estatísticas por sílaba começam a partir das novas respostas.</p>
+        <p v-if="!detailedAttempts.length" class="dashboard-empty">As estatísticas por sílaba começam a partir das respostas registradas.</p>
         <div v-else class="syllable-performance-list">
           <article v-for="item in syllablePerformance" :key="item.label">
             <div><strong>{{ item.label }}</strong><span>{{ item.errors }} erros em {{ item.attempts }}</span></div>
