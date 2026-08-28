@@ -179,14 +179,15 @@ const isAspirated = computed(() => guide.value?.aspiration === 'Aspirada')
 
 .initial-guide-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 0.95fr) minmax(0, 1.05fr);
-  gap: 18px;
-  padding: 0 22px 20px;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  padding: 0 22px 22px;
 }
 
 .initial-guide-copy {
   display: grid;
-  gap: 13px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
   align-content: start;
 }
 
@@ -196,18 +197,18 @@ const isAspirated = computed(() => guide.value?.aspiration === 'Aspirada')
 
 .initial-guide-copy h4 {
   margin: 0 0 4px;
-  font-size: 0.8rem;
+  font-size: 0.82rem;
 }
 
 .initial-guide-copy p {
   margin: 0;
   color: #52606d;
-  font-size: 0.86rem;
-  line-height: 1.55;
+  font-size: 0.88rem;
+  line-height: 1.58;
 }
 
 .contrast-tip {
-  padding: 11px 12px;
+  padding: 12px 14px;
   border-radius: 12px;
   background: #eef8f2;
 }
@@ -235,12 +236,12 @@ const isAspirated = computed(() => guide.value?.aspiration === 'Aspirada')
 }
 
 @media (max-width: 780px) {
-  .initial-guide-layout {
-    grid-template-columns: 1fr;
-  }
-
   .initial-guide-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .initial-guide-copy {
+    grid-template-columns: 1fr;
   }
 }
 </style>
