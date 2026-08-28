@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { generatedAudioSamples } from '../data/generatedAudioCatalog'
+import { humanAudioSamples } from '../data/audioCatalog'
 import { pinyinInitials } from '../data/pinyinMatrix'
 import { toneDisplay } from '../data/toneDisplay'
 import { playHumanAudio } from '../services/audioPlayer'
 import { comparePronunciation, type PronunciationReport } from '../services/pronunciationAnalysis'
 import type { HumanAudioSample, MandarinTone } from '../types/audio'
 
-const samples = generatedAudioSamples.filter((sample) => sample.verifiedHuman && sample.localFile && sample.tone !== 5)
+const samples = humanAudioSamples.filter((sample) => sample.verifiedHuman && sample.tone !== 5)
 const initialOptions = pinyinInitials.filter((initial) => samples.some((sample) => sample.initial === initial.value))
 const selectedInitial = ref(initialOptions.some((initial) => initial.value === 'b') ? 'b' : initialOptions[0]?.value ?? '')
 const selectedFinal = ref('')
@@ -23,9 +23,19 @@ let activeStream: MediaStream | null = null
 let chunks: BlobPart[] = []
 let stopTimer: number | undefined
 
-const availableFinals = computed(() => [...new Set(samples.filter((sample) => sample.initial === selectedInitial.value).map((sample) => sample.final))].sort())
-const availableTones = computed(() => [...new Set(samples.filter((sample) => sample.initial === selectedInitial.value && sample.final === selectedFinal.value).map((sample) => sample.tone))].sort() as MandarinTone[])
-const selectedSample = computed<HumanAudioSample | undefined>(() => samples.find((sample) => sample.initial === selectedInitial.value && sample.final === selectedFinal.value && sample.tone === selectedTone.value))
+const availableFinals = computed(() => [...new Set(
+  samples.filter((sample) => sample.initial === selectedInitial.value).map((sample) => sample.final),
+)].sort())
+const availableTones = computed(() => [...new Set(
+  samples
+    .filter((sample) => sample.initial === selectedInitial.value && sample.final === selectedFinal.value)
+    .map((sample) => sample.tone),
+)].sort() as MandarinTone[])
+const selectedSample = computed<HumanAudioSample | undefined>(() => samples.find((sample) =>
+  sample.initial === selectedInitial.value
+  && sample.final === selectedFinal.value
+  && sample.tone === selectedTone.value,
+))
 
 watch(availableFinals, (finals) => {
   if (!finals.includes(selectedFinal.value)) selectedFinal.value = finals[0] ?? ''
@@ -58,9 +68,24 @@ function contourPoints(values: number[]): string {
   }).join(' ')
 }
 
-function resolveAudioUrl(audioUrl: string): string {
-  const relativePath = audioUrl.replace(/^\/+/, '')
-  return `${import.meta.env.BASE_URL}${relativePath}`
+function resolveReferenceUrl(audioUrl: string): string {
+  if (/^https?:\/\//i.test(audioUrl)) return audioUrl
+  return `${import.meta.env.BASE_URL}${audioUrl.replace(/^\/+/, '')}`
+}
+
+async function fetchReferenceAudio(sample: HumanAudioSample): Promise<ArrayBuffer> {
+  const url = resolveReferenceUrl(sample.audioUrl)
+  const absoluteUrl = new URL(url, window.location.href)
+  const sameOrigin = absoluteUrl.origin === window.location.origin
+  const response = await fetch(absoluteUrl, {
+    cache: 'force-cache',
+    credentials: sameOrigin ? 'same-origin' : 'omit',
+    mode: 'cors',
+  })
+  if (!response.ok) {
+    throw new Error(`Não foi possível carregar a gravação humana de referência (HTTP ${response.status}).`)
+  }
+  return response.arrayBuffer()
 }
 
 async function playReference(): Promise<void> {
@@ -98,9 +123,10 @@ async function analyzeBlob(blob: Blob): Promise<void> {
   recordingUrl.value = URL.createObjectURL(blob)
 
   try {
-    const referenceResponse = await fetch(resolveAudioUrl(sample.audioUrl), { cache: 'force-cache', credentials: 'same-origin' })
-    if (!referenceResponse.ok) throw new Error('Não foi possível carregar a gravação humana de referência.')
-    const [referenceData, userData] = await Promise.all([referenceResponse.arrayBuffer(), blob.arrayBuffer()])
+    const [referenceData, userData] = await Promise.all([
+      fetchReferenceAudio(sample),
+      blob.arrayBuffer(),
+    ])
     report.value = await comparePronunciation(referenceData, userData)
   } catch (error) {
     microphoneError.value = error instanceof Error ? error.message : 'Não foi possível analisar a gravação.'
