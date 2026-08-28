@@ -7,13 +7,15 @@ import FlashcardTrainer from './components/FlashcardTrainer.vue'
 
 const RadicalsExplorer = defineAsyncComponent(() => import('./components/RadicalsExplorer.vue'))
 const TonePairTrainer = defineAsyncComponent(() => import('./components/TonePairTrainer.vue'))
+const SentenceTrainer = defineAsyncComponent(() => import('./components/SentenceTrainer.vue'))
 const PronunciationCoach = defineAsyncComponent(() => import('./components/PronunciationCoach.vue'))
 
-type AppTab = 'comparison' | 'flashcards' | 'tones' | 'pronunciation' | 'radicals'
+type AppTab = 'comparison' | 'flashcards' | 'tones' | 'sentences' | 'pronunciation' | 'radicals'
 
 function tabFromHash(): AppTab {
   if (window.location.hash === '#/flashcards') return 'flashcards'
   if (window.location.hash === '#/tones') return 'tones'
+  if (window.location.hash === '#/sentences') return 'sentences'
   if (window.location.hash === '#/pronunciation') return 'pronunciation'
   if (window.location.hash === '#/radicals') return 'radicals'
   return 'comparison'
@@ -31,6 +33,7 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncTabWithHash))
 const heroTitle = computed(() => {
   if (activeTab.value === 'flashcards') return 'Flashcards auditivos'
   if (activeTab.value === 'tones') return 'Identificação de pares tonais'
+  if (activeTab.value === 'sentences') return 'Treino auditivo com frases'
   if (activeTab.value === 'pronunciation') return 'Corretor de pronúncia'
   if (activeTab.value === 'radicals') return 'Radicais chineses'
   return 'Treino auditivo de Pinyin'
@@ -42,6 +45,9 @@ const heroCopy = computed(() => {
   }
   if (activeTab.value === 'tones') {
     return 'Escolha quais tons podem aparecer, ouça palavras reais de duas sílabas e identifique o tom da primeira e da segunda sílaba.'
+  }
+  if (activeTab.value === 'sentences') {
+    return 'Ouça frases humanas e identifique, sílaba por sílaba, as iniciais, finais ou tons. Também há modo de estudo automático com poucos cliques.'
   }
   if (activeTab.value === 'pronunciation') {
     return 'Use o microfone para comparar sua curva tonal com uma gravação humana. A análise acontece localmente no navegador e mostra onde o contorno precisa de ajuste.'
@@ -65,6 +71,7 @@ const heroCopy = computed(() => {
     <ComparisonTrainer v-if="activeTab === 'comparison'" />
     <FlashcardTrainer v-else-if="activeTab === 'flashcards'" />
     <TonePairTrainer v-else-if="activeTab === 'tones'" />
+    <SentenceTrainer v-else-if="activeTab === 'sentences'" />
     <PronunciationCoach v-else-if="activeTab === 'pronunciation'" />
     <RadicalsExplorer v-else />
   </main>
