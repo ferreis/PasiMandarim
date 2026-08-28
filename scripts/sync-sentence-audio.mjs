@@ -8,6 +8,7 @@ const OUTPUT_DIR = path.join(ROOT, 'public', 'audio', 'tatoeba')
 const CATALOG_PATH = path.join(ROOT, 'src', 'data', 'generatedSentenceCatalog.ts')
 const TARGET_SENTENCES = 30
 const MAX_PAGES = 8
+const DETAIL_BATCH_SIZE = 8
 const MAX_AUDIO_BYTES = 5 * 1024 * 1024
 const ALLOWED_AUDIO_HOSTS = new Set(['api.tatoeba.org', 'tatoeba.org', 'www.tatoeba.org', 'audio.tatoeba.org'])
 const VALID_FINALS = new Set([
@@ -155,8 +156,9 @@ async function collectSentences() {
 
   for (let page = 0; page < MAX_PAGES && accepted.length < TARGET_SENTENCES; page += 1) {
     const payload = await fetchJson(makeSearchUrl(after))
+    const eligible = []
+
     for (const sentence of payload.data ?? []) {
-      if (accepted.length >= TARGET_SENTENCES) break
       if (!sentence?.id || seenSentenceIds.has(sentence.id)) continue
       seenSentenceIds.add(sentence.id)
       rejected.fetched += 1
@@ -180,26 +182,35 @@ async function collectSentences() {
       }))
       if (syllables.some((item) => !VALID_FINALS.has(item.final))) { rejected.final += 1; continue }
 
-      const audio = await fetchLicensedAudio(sentence.id)
-      if (!audio) { rejected.audio += 1; continue }
-
-      accepted.push({
-        id: sentence.id,
-        text: sentence.text,
-        translationPt,
-        pinyin: syllables.map((item) => item.pinyin).join(' '),
-        syllables,
-        audio: {
-          id: audio.id,
-          path: `/audio/tatoeba/${audio.id}.mp3`,
-          author: audio.author,
-          license: audio.licence,
-          attributionUrl: audio.attribution_url || `https://tatoeba.org/users/profile/${encodeURIComponent(audio.author)}`,
-        },
-        sourceUrl: `https://tatoeba.org/pt-br/sentences/show/${sentence.id}`,
-        textLicense: sentence.license,
-      })
+      eligible.push({ sentence, translationPt, syllables })
     }
+
+    for (let index = 0; index < eligible.length && accepted.length < TARGET_SENTENCES; index += DETAIL_BATCH_SIZE) {
+      const batch = eligible.slice(index, index + DETAIL_BATCH_SIZE)
+      const audios = await Promise.all(batch.map(({ sentence }) => fetchLicensedAudio(sentence.id)))
+      for (let offset = 0; offset < batch.length && accepted.length < TARGET_SENTENCES; offset += 1) {
+        const { sentence, translationPt, syllables } = batch[offset]
+        const audio = audios[offset]
+        if (!audio) { rejected.audio += 1; continue }
+        accepted.push({
+          id: sentence.id,
+          text: sentence.text,
+          translationPt,
+          pinyin: syllables.map((item) => item.pinyin).join(' '),
+          syllables,
+          audio: {
+            id: audio.id,
+            path: `/audio/tatoeba/${audio.id}.mp3`,
+            author: audio.author,
+            license: audio.licence,
+            attributionUrl: audio.attribution_url || `https://tatoeba.org/users/profile/${encodeURIComponent(audio.author)}`,
+          },
+          sourceUrl: `https://tatoeba.org/pt-br/sentences/show/${sentence.id}`,
+          textLicense: sentence.license,
+        })
+      }
+    }
+
     if (!payload.paging?.has_next) break
     after = extractAfter(payload.paging.next)
     if (!after) break
