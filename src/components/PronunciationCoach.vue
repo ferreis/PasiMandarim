@@ -17,6 +17,14 @@ const analyzing = ref(false)
 const microphoneError = ref('')
 const report = ref<PronunciationReport | null>(null)
 const recordingUrl = ref('')
+const requestedCards = ref(10)
+const sessionSamples = ref<HumanAudioSample[]>([])
+const currentIndex = ref(0)
+const sessionActive = ref(false)
+const sessionFinished = ref(false)
+const sessionScores = ref<number[]>([])
+
+const quantityOptions = [5, 10, 20, 30]
 
 let mediaRecorder: MediaRecorder | null = null
 let activeStream: MediaStream | null = null
@@ -36,6 +44,9 @@ const selectedSample = computed<HumanAudioSample | undefined>(() => samples.find
   && sample.final === selectedFinal.value
   && sample.tone === selectedTone.value,
 ))
+const averageSessionScore = computed(() => sessionScores.value.length
+  ? Math.round(sessionScores.value.reduce((sum, value) => sum + value, 0) / sessionScores.value.length)
+  : 0)
 
 watch(availableFinals, (finals) => {
   if (!finals.includes(selectedFinal.value)) selectedFinal.value = finals[0] ?? ''
@@ -58,6 +69,84 @@ const chartBounds = computed(() => {
   const max = Math.max(...values) + 0.5
   return max - min < 1 ? { min: min - 1, max: max + 1 } : { min, max }
 })
+
+function randomIndex(max: number): number {
+  if (max <= 1) return 0
+  const limit = Math.floor(0x100000000 / max) * max
+  const buffer = new Uint32Array(1)
+  do globalThis.crypto.getRandomValues(buffer)
+  while (buffer[0] >= limit)
+  return buffer[0] % max
+}
+
+function shuffle<T>(items: T[]): T[] {
+  const result = [...items]
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const target = randomIndex(index + 1)
+    ;[result[index], result[target]] = [result[target], result[index]]
+  }
+  return result
+}
+
+function buildSession(count: number): HumanAudioSample[] {
+  const result: HumanAudioSample[] = []
+  while (result.length < count && samples.length) {
+    for (const sample of shuffle(samples)) {
+      if (result.length >= count) break
+      if (result.at(-1)?.pinyin === sample.pinyin && samples.length > 1) continue
+      result.push(sample)
+    }
+  }
+  return result
+}
+
+function applySessionSample(sample: HumanAudioSample): void {
+  selectedInitial.value = sample.initial
+  selectedFinal.value = sample.final
+  selectedTone.value = sample.tone
+  report.value = null
+  microphoneError.value = ''
+  revokeRecordingUrl()
+}
+
+function startSession(): void {
+  if (recording.value || analyzing.value || !samples.length) return
+  const generated = buildSession(requestedCards.value)
+  if (!generated.length) return
+
+  sessionSamples.value = generated
+  currentIndex.value = 0
+  sessionScores.value = []
+  sessionFinished.value = false
+  sessionActive.value = true
+  applySessionSample(generated[0])
+}
+
+function nextSessionCard(): void {
+  if (!sessionActive.value || !report.value) return
+  sessionScores.value = [...sessionScores.value, report.value.overallScore]
+
+  if (currentIndex.value >= sessionSamples.value.length - 1) {
+    sessionActive.value = false
+    sessionFinished.value = true
+    return
+  }
+
+  currentIndex.value += 1
+  applySessionSample(sessionSamples.value[currentIndex.value])
+}
+
+function endSession(): void {
+  if (recording.value) stopRecording()
+  sessionActive.value = false
+  sessionFinished.value = false
+  sessionSamples.value = []
+  currentIndex.value = 0
+  sessionScores.value = []
+  report.value = null
+  microphoneError.value = ''
+  revokeRecordingUrl()
+}
 
 function contourPoints(values: number[]): string {
   const { min, max } = chartBounds.value
@@ -207,18 +296,53 @@ onBeforeUnmount(() => {
       <div class="pronunciation-intro">
         <p class="eyebrow">Corretor local</p>
         <h2>Compare sua pronúncia com uma gravação humana</h2>
-        <p>Escolha uma sílaba, ouça a referência e grave sua tentativa. A análise compara o contorno tonal e o ritmo sem enviar sua voz para um servidor.</p>
+        <p>Gere uma sessão de alvos aleatórios ou pratique livremente. A análise compara o contorno tonal e o ritmo sem enviar sua voz para um servidor.</p>
       </div>
 
+      <div class="pronunciation-session-setup">
+        <label>
+          <span class="field-label">Quantidade</span>
+          <select v-model.number="requestedCards" :disabled="sessionActive || recording || analyzing">
+            <option v-for="quantity in quantityOptions" :key="quantity" :value="quantity">{{ quantity }} flashcards</option>
+          </select>
+        </label>
+        <button v-if="!sessionActive" class="primary-action" type="button" :disabled="recording || analyzing || !samples.length" @click="startSession">
+          Gerar flashcards de pronúncia
+        </button>
+        <button v-else class="secondary-record-button" type="button" :disabled="recording || analyzing" @click="endSession">
+          Encerrar sessão
+        </button>
+      </div>
+
+      <div v-if="sessionActive" class="pronunciation-session-progress" aria-live="polite">
+        <strong>Flashcard {{ currentIndex + 1 }} de {{ sessionSamples.length }}</strong>
+        <progress :value="currentIndex" :max="sessionSamples.length"></progress>
+        <span>O alvo foi sorteado. Ouça a referência e tente reproduzir a sílaba.</span>
+      </div>
+
+      <div v-else-if="sessionFinished" class="pronunciation-session-summary" role="status">
+        <div>
+          <span>Sessão concluída</span>
+          <strong>{{ sessionScores.length }} flashcards analisados</strong>
+        </div>
+        <div>
+          <span>Média da sessão</span>
+          <strong>{{ averageSessionScore }}/100</strong>
+        </div>
+        <button class="primary-action" type="button" @click="startSession">Gerar nova sessão</button>
+      </div>
+
+      <p v-if="!sessionActive" class="pronunciation-free-note">Os seletores abaixo também podem ser usados livremente fora de uma sessão.</p>
+
       <div class="pronunciation-selectors">
-        <label><span class="field-label">Inicial</span><select v-model="selectedInitial" :disabled="recording || analyzing"><option v-for="initial in initialOptions" :key="initial.value || 'zero'" :value="initial.value">{{ initial.label }}</option></select></label>
-        <label><span class="field-label">Final</span><select v-model="selectedFinal" :disabled="recording || analyzing"><option v-for="final in availableFinals" :key="final" :value="final">{{ final }}</option></select></label>
-        <label><span class="field-label">Tom</span><select v-model.number="selectedTone" :disabled="recording || analyzing"><option v-for="tone in availableTones" :key="tone" :value="tone">{{ toneDisplay[tone].symbol }} {{ toneDisplay[tone].label }}</option></select></label>
+        <label><span class="field-label">Inicial</span><select v-model="selectedInitial" :disabled="recording || analyzing || sessionActive"><option v-for="initial in initialOptions" :key="initial.value || 'zero'" :value="initial.value">{{ initial.label }}</option></select></label>
+        <label><span class="field-label">Final</span><select v-model="selectedFinal" :disabled="recording || analyzing || sessionActive"><option v-for="final in availableFinals" :key="final" :value="final">{{ final }}</option></select></label>
+        <label><span class="field-label">Tom</span><select v-model.number="selectedTone" :disabled="recording || analyzing || sessionActive"><option v-for="tone in availableTones" :key="tone" :value="tone">{{ toneDisplay[tone].symbol }} {{ toneDisplay[tone].label }}</option></select></label>
       </div>
 
       <article v-if="selectedSample" class="pronunciation-target">
         <div>
-          <span>Pronúncia alvo</span>
+          <span>{{ sessionActive ? 'Flashcard de pronúncia' : 'Pronúncia alvo' }}</span>
           <strong>{{ selectedSample.pinyin }}</strong>
           <small>{{ selectedSample.hanzi || 'Sílaba isolada' }} · {{ selectedSample.speaker }}</small>
         </div>
@@ -273,12 +397,16 @@ onBeforeUnmount(() => {
           <strong>O que esta versão consegue corrigir?</strong>
           <p>Ela avalia contorno do tom e duração. Ainda não classifica automaticamente se uma inicial como <b>zh</b> virou <b>z</b>, nem se uma final foi articulada incorretamente. Essa parte exige um modelo fonético específico; o site não apresenta essa conclusão sem uma medição confiável.</p>
         </aside>
+
+        <button v-if="sessionActive" class="pronunciation-next-card" type="button" @click="nextSessionCard">
+          {{ currentIndex === sessionSamples.length - 1 ? 'Finalizar sessão' : 'Próximo flashcard' }}
+        </button>
       </section>
     </section>
 
     <aside class="mini-dashboard pronunciation-help" aria-label="Como usar o corretor de pronúncia">
       <p class="eyebrow">Como usar</p>
-      <h2>Uma tentativa por vez</h2>
+      <h2>{{ sessionActive ? 'Sessão de pronúncia' : 'Uma tentativa por vez' }}</h2>
       <ol>
         <li>Ouça a gravação humana algumas vezes.</li>
         <li>Grave uma única sílaba, sem falar outras palavras.</li>

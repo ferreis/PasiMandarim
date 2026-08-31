@@ -3,54 +3,64 @@ import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 
 import AppFooter from './components/AppFooter.vue'
 import AppHeader from './components/AppHeader.vue'
 import ComparisonTrainer from './components/ComparisonTrainer.vue'
-import FlashcardTrainer from './components/FlashcardTrainer.vue'
 
+const FlashcardHub = defineAsyncComponent(() => import('./components/FlashcardHub.vue'))
 const RadicalsExplorer = defineAsyncComponent(() => import('./components/RadicalsExplorer.vue'))
-const TonePairTrainer = defineAsyncComponent(() => import('./components/TonePairTrainer.vue'))
-const SentenceTrainer = defineAsyncComponent(() => import('./components/SentenceTrainer.vue'))
-const PronunciationCoach = defineAsyncComponent(() => import('./components/PronunciationCoach.vue'))
 
-type AppTab = 'comparison' | 'flashcards' | 'tones' | 'sentences' | 'pronunciation' | 'radicals'
+type AppTab = 'comparison' | 'flashcards' | 'radicals'
+type FlashcardCategory = 'comparison' | 'tones' | 'sentences' | 'pronunciation'
 
-function tabFromHash(): AppTab {
-  if (window.location.hash === '#/flashcards') return 'flashcards'
-  if (window.location.hash === '#/tones') return 'tones'
-  if (window.location.hash === '#/sentences') return 'sentences'
-  if (window.location.hash === '#/pronunciation') return 'pronunciation'
-  if (window.location.hash === '#/radicals') return 'radicals'
-  return 'comparison'
+type RouteState = {
+  tab: AppTab
+  flashcardCategory: FlashcardCategory
 }
 
-const activeTab = ref<AppTab>(typeof window === 'undefined' ? 'comparison' : tabFromHash())
+function routeFromHash(): RouteState {
+  const hash = window.location.hash
 
-function syncTabWithHash(): void {
-  activeTab.value = tabFromHash()
+  if (hash === '#/radicals') return { tab: 'radicals', flashcardCategory: 'comparison' }
+
+  if (hash === '#/flashcards/tones' || hash === '#/tones') {
+    return { tab: 'flashcards', flashcardCategory: 'tones' }
+  }
+  if (hash === '#/flashcards/sentences' || hash === '#/sentences') {
+    return { tab: 'flashcards', flashcardCategory: 'sentences' }
+  }
+  if (hash === '#/flashcards/pronunciation' || hash === '#/pronunciation') {
+    return { tab: 'flashcards', flashcardCategory: 'pronunciation' }
+  }
+  if (hash === '#/flashcards' || hash === '#/flashcards/comparison') {
+    return { tab: 'flashcards', flashcardCategory: 'comparison' }
+  }
+
+  return { tab: 'comparison', flashcardCategory: 'comparison' }
 }
 
-onMounted(() => window.addEventListener('hashchange', syncTabWithHash))
-onBeforeUnmount(() => window.removeEventListener('hashchange', syncTabWithHash))
+const initialRoute = typeof window === 'undefined'
+  ? { tab: 'comparison' as AppTab, flashcardCategory: 'comparison' as FlashcardCategory }
+  : routeFromHash()
+
+const activeTab = ref<AppTab>(initialRoute.tab)
+const activeFlashcardCategory = ref<FlashcardCategory>(initialRoute.flashcardCategory)
+
+function syncRouteWithHash(): void {
+  const route = routeFromHash()
+  activeTab.value = route.tab
+  activeFlashcardCategory.value = route.flashcardCategory
+}
+
+onMounted(() => window.addEventListener('hashchange', syncRouteWithHash))
+onBeforeUnmount(() => window.removeEventListener('hashchange', syncRouteWithHash))
 
 const heroTitle = computed(() => {
   if (activeTab.value === 'flashcards') return 'Flashcards auditivos'
-  if (activeTab.value === 'tones') return 'Identificação de pares tonais'
-  if (activeTab.value === 'sentences') return 'Treino auditivo com frases'
-  if (activeTab.value === 'pronunciation') return 'Corretor de pronúncia'
   if (activeTab.value === 'radicals') return 'Radicais chineses'
   return 'Treino auditivo de Pinyin'
 })
 
 const heroCopy = computed(() => {
   if (activeTab.value === 'flashcards') {
-    return 'Escolha duas iniciais e a quantidade de questões. O sistema sorteia finais e tons com áudio humano, embaralha cada rodada e acompanha seu desempenho.'
-  }
-  if (activeTab.value === 'tones') {
-    return 'Escolha quais tons podem aparecer, ouça palavras reais de duas sílabas e identifique o tom da primeira e da segunda sílaba.'
-  }
-  if (activeTab.value === 'sentences') {
-    return 'Ouça frases humanas e identifique, sílaba por sílaba, as iniciais, finais ou tons. Também há modo de estudo automático com poucos cliques.'
-  }
-  if (activeTab.value === 'pronunciation') {
-    return 'Use o microfone para comparar sua curva tonal com uma gravação humana. A análise acontece localmente no navegador e mostra onde o contorno precisa de ajuste.'
+    return 'Escolha o tipo de treino e gere uma sessão de flashcards para praticar comparação de iniciais, tons, frases ou pronúncia.'
   }
   if (activeTab.value === 'radicals') {
     return 'Explore os 214 radicais Kangxi por símbolo, Pinyin, significado, número de traços, variantes e evidências históricas verificáveis.'
@@ -69,10 +79,7 @@ const heroCopy = computed(() => {
     </section>
 
     <ComparisonTrainer v-if="activeTab === 'comparison'" />
-    <FlashcardTrainer v-else-if="activeTab === 'flashcards'" />
-    <TonePairTrainer v-else-if="activeTab === 'tones'" />
-    <SentenceTrainer v-else-if="activeTab === 'sentences'" />
-    <PronunciationCoach v-else-if="activeTab === 'pronunciation'" />
+    <FlashcardHub v-else-if="activeTab === 'flashcards'" :active-category="activeFlashcardCategory" />
     <RadicalsExplorer v-else />
   </main>
 

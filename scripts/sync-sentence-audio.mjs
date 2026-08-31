@@ -9,6 +9,8 @@ const CATALOG_PATH = path.join(ROOT, 'src', 'data', 'generatedSentenceCatalog.ts
 const TARGET_SENTENCES = 30
 const MAX_PAGES = 8
 const MAX_AUDIO_BYTES = 5 * 1024 * 1024
+const FETCH_ATTEMPTS = 3
+const FETCH_TIMEOUT_MS = 30_000
 const ALLOWED_AUDIO_HOSTS = new Set(['api.tatoeba.org', 'tatoeba.org', 'www.tatoeba.org', 'audio.tatoeba.org'])
 const VALID_FINALS = new Set([
   'a','o','e','ai','ei','ao','ou','an','en','ang','eng','er','i','ia','iao','ie','iu','ian','in','iang','ing','iong',
@@ -97,8 +99,39 @@ function pickAudio(audios = []) {
   return audios.find((audio) => audio?.id && reusableLicense(audioLicense(audio))) ?? null
 }
 
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds))
+}
+
+async function fetchWithRetry(url, options = {}, label = 'Recurso remoto') {
+  let lastError = null
+
+  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      })
+      const retryableStatus = response.status === 429 || response.status >= 500
+      if (response.ok || !retryableStatus) return response
+
+      await response.body?.cancel()
+      lastError = new Error(`HTTP ${response.status}`)
+    } catch (error) {
+      lastError = error
+    }
+
+    if (attempt < FETCH_ATTEMPTS) await wait(attempt * 1_000)
+  }
+
+  const reason = lastError instanceof Error ? lastError.message : 'erro de rede desconhecido'
+  throw new Error(`${label}: falha após ${FETCH_ATTEMPTS} tentativas (${reason}).`)
+}
+
 async function fetchJson(url) {
-  const response = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'learning-mandarin-static-sync/1.0' } })
+  const response = await fetchWithRetry(url, {
+    headers: { Accept: 'application/json', 'User-Agent': 'learning-mandarin-static-sync/1.0' },
+  }, 'Tatoeba API')
   if (!response.ok) throw new Error(`Tatoeba API ${response.status}: ${url}`)
   return response.json()
 }
@@ -106,7 +139,10 @@ async function fetchJson(url) {
 async function downloadAudio(audioId, destination) {
   if (existsSync(destination)) return
   const url = `https://api.tatoeba.org/v1/audios/${audioId}/file`
-  const response = await fetch(url, { redirect: 'follow', headers: { 'User-Agent': 'learning-mandarin-static-sync/1.0' } })
+  const response = await fetchWithRetry(url, {
+    redirect: 'follow',
+    headers: { 'User-Agent': 'learning-mandarin-static-sync/1.0' },
+  }, `Áudio ${audioId}`)
   if (!response.ok) throw new Error(`Áudio ${audioId}: HTTP ${response.status}`)
   const finalUrl = new URL(response.url)
   if (finalUrl.protocol !== 'https:' || !ALLOWED_AUDIO_HOSTS.has(finalUrl.hostname)) {
