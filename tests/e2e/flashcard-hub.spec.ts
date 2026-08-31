@@ -49,7 +49,8 @@ test('mantém compatibilidade com as rotas antigas', async ({ page }) => {
 test('gera a quantidade escolhida de flashcards de pronúncia', async ({ page }) => {
   await page.goto('/#/flashcards/pronunciation')
 
-  const quantity = page.getByLabel('Quantidade', { exact: true })
+  const quantity = page.locator('.pronunciation-session-setup select')
+  await expect(quantity).toHaveCount(1)
   await quantity.selectOption('5')
   await page.getByRole('button', { name: 'Gerar flashcards de pronúncia' }).click()
 
