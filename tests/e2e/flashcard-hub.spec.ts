@@ -49,14 +49,17 @@ test('mantém compatibilidade com as rotas antigas', async ({ page }) => {
 test('gera a quantidade escolhida de flashcards de pronúncia', async ({ page }) => {
   await page.goto('/#/flashcards/pronunciation')
 
-  const quantity = page.getByLabel('Quantidade')
+  const quantity = page.getByLabel('Quantidade', { exact: true })
   await quantity.selectOption('5')
   await page.getByRole('button', { name: 'Gerar flashcards de pronúncia' }).click()
 
   await expect(page.getByText('Flashcard 1 de 5')).toBeVisible()
   await expect(quantity).toBeDisabled()
-  await expect(page.getByLabel('Inicial')).toBeDisabled()
-  await expect(page.getByLabel('Final')).toBeDisabled()
-  await expect(page.getByLabel('Tom')).toBeDisabled()
+
+  const pronunciationSelectors = page.locator('.pronunciation-selectors select')
+  await expect(pronunciationSelectors).toHaveCount(3)
+  await expect(pronunciationSelectors.nth(0)).toBeDisabled()
+  await expect(pronunciationSelectors.nth(1)).toBeDisabled()
+  await expect(pronunciationSelectors.nth(2)).toBeDisabled()
   await expect(page.getByRole('button', { name: 'Encerrar sessão' })).toBeVisible()
 })
