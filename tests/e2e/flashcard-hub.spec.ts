@@ -13,7 +13,7 @@ test('agrupa os exercícios e configurações dentro da área de flashcards', as
     'Tons',
     'Frases',
     'Pronúncia',
-    'Configurações de FlashCard',
+    'Configurações',
   ])
   await expect(categoryNav.getByRole('link', { name: 'Comparação' })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByText('Identifique qual das duas iniciais foi pronunciada.', { exact: true })).toHaveCount(0)
@@ -39,7 +39,7 @@ test('troca de categoria sem sair de flashcards', async ({ page }) => {
   await expect(page).toHaveURL(/#\/flashcards\/pronunciation$/)
   await expect(page.getByRole('button', { name: 'Gerar flashcards de pronúncia' })).toBeVisible()
 
-  await categoryNav.getByRole('link', { name: 'Configurações de FlashCard' }).click()
+  await categoryNav.getByRole('link', { name: 'Configurações' }).click()
   await expect(page).toHaveURL(/#\/flashcards\/settings$/)
   await expect(page.getByRole('heading', { name: 'Preferências dos treinos' })).toBeVisible()
 })

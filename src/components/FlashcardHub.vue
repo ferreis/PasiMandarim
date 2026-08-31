@@ -18,7 +18,7 @@ const categories: { id: FlashcardCategory; label: string; href: string }[] = [
   { id: 'tones', label: 'Tons', href: '#/flashcards/tones' },
   { id: 'sentences', label: 'Frases', href: '#/flashcards/sentences' },
   { id: 'pronunciation', label: 'Pronúncia', href: '#/flashcards/pronunciation' },
-  { id: 'settings', label: 'Configurações de FlashCard', href: '#/flashcards/settings' },
+  { id: 'settings', label: 'Configurações', href: '#/flashcards/settings' },
 ]
 
 const activeComponent = computed(() => {

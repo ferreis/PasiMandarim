@@ -70,7 +70,7 @@ test('ativa o modo estudo da comparação pela aba de configurações sem perder
   await expect(page.getByText('Questão 1 de 5')).toBeVisible()
 
   await page.getByRole('navigation', { name: 'Categorias de flashcards' })
-    .getByRole('link', { name: 'Configurações de FlashCard' })
+    .getByRole('link', { name: 'Configurações' })
     .click()
   await page.getByLabel('Modo estudo automático').check()
 

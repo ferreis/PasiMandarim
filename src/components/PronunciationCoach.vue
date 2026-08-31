@@ -315,7 +315,7 @@ onBeforeUnmount(() => {
       <div class="pronunciation-intro">
         <p class="eyebrow">Corretor local</p>
         <h2>Compare sua pronúncia com uma gravação humana</h2>
-        <p>Gere uma sessão de alvos aleatórios ou pratique livremente. A quantidade e a repetição da referência seguem as Configurações de FlashCard.</p>
+        <p>Gere uma sessão de alvos aleatórios ou pratique livremente. A quantidade e a repetição da referência seguem as Configurações.</p>
       </div>
 
       <div class="pronunciation-session-setup">

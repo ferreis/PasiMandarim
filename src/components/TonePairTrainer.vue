@@ -344,7 +344,7 @@ onBeforeUnmount(cancelAutomation)
       <div class="tone-setup-copy">
         <p class="eyebrow">Configuração</p>
         <h2>Escolha quais tons quer treinar</h2>
-        <p>A primeira sílaba usa os tons 1–4. A segunda pode usar 1–4 ou o tom neutro. As preferências gerais desta sessão são salvas nas Configurações de FlashCard.</p>
+        <p>A primeira sílaba usa os tons 1–4. A segunda pode usar 1–4 ou o tom neutro. As preferências gerais desta sessão são salvas nas Configurações.</p>
       </div>
 
       <div class="tone-selector-grid">

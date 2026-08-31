@@ -308,7 +308,7 @@ onBeforeUnmount(cancelAutomation)
       <div class="sentence-setup-copy">
         <p class="eyebrow">Frases</p>
         <h2>Identifique cada sílaba dentro de uma frase real</h2>
-        <p>Escolha se quer treinar iniciais, finais ou tons. Quantidade, repetição e modo estudo seguem as Configurações de FlashCard salvas neste navegador.</p>
+        <p>Escolha se quer treinar iniciais, finais ou tons. Quantidade, repetição e modo estudo seguem as Configurações salvas neste navegador.</p>
       </div>
 
       <div class="sentence-mode-tabs" role="radiogroup" aria-label="Tipo de identificação">
