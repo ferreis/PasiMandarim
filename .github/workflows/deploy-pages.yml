@@ -1,4 +1,4 @@
-# Gera catálogos a partir de fontes estáticas, valida o projeto e publica o build no GitHub Pages.
+# Gera catálogos a partir de fontes estáticas verificadas, valida o projeto e publica o build no GitHub Pages.
 name: Publicação do site estático
 
 on:
