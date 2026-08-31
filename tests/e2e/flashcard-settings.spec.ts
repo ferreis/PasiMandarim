@@ -87,7 +87,7 @@ test('ativa o modo estudo da comparação pela aba de configurações sem perder
 test('remove os textos substituídos da área de flashcards', async ({ page }) => {
   await page.goto('/#/flashcards/comparison')
 
-  await expect(page.getByRole('heading', { name: 'Flashcards' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Flashcards', exact: true })).toBeVisible()
   await expect(page.getByText('Flashcards auditivos', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Você pode trocar de categoria a qualquer momento. As configurações gerais e os históricos ficam salvos somente neste navegador.', { exact: true })).toHaveCount(0)
   await expect(page.getByText('Identifique qual das duas iniciais foi pronunciada.', { exact: true })).toHaveCount(0)
