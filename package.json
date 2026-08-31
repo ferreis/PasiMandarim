@@ -18,6 +18,7 @@
     "tone-pairs:sync": "node scripts/sync-tone-pair-audio.mjs",
     "tone-pairs:sync:force": "node scripts/sync-tone-pair-audio.mjs --force",
     "phrases:sync": "node scripts/sync-sentence-audio.mjs",
+    "phrases:fixture": "node scripts/generate-sentence-fixture.mjs",
     "radicals:sync": "node scripts/sync-radicals.mjs"
   },
   "dependencies": {
