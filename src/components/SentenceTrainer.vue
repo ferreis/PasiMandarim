@@ -1,17 +1,22 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, toRef, watch } from 'vue'
 import { sentencePracticeCatalog, type SentencePracticeItem, type SentenceSyllable } from '../data/generatedSentenceCatalog'
 import { pinyinInitials } from '../data/pinyinMatrix'
 import { toneDisplay } from '../data/toneDisplay'
+import {
+  flashcardQuantityOptions,
+  flashcardSettings,
+} from '../services/flashcardSettings'
 
 type TrainingMode = 'initial' | 'final' | 'tone'
 type PhraseAttempt = { mode: TrainingMode; correct: number; total: number; perfect: boolean }
 
 const mode = ref<TrainingMode>('tone')
-const requestedCards = ref(10)
-const quantityOptions = [5, 10, 20]
-const autoRepeat = ref(true)
-const studyMode = ref(false)
+const requestedCards = toRef(flashcardSettings, 'quantity')
+const quantityOptions = flashcardQuantityOptions
+const autoRepeat = toRef(flashcardSettings, 'autoRepeat')
+const studyMode = toRef(flashcardSettings, 'studyMode')
+const repeatDelayMs = toRef(flashcardSettings, 'repeatDelayMs')
 const questions = ref<SentencePracticeItem[]>([])
 const currentIndex = ref(0)
 const answers = ref<string[]>([])
@@ -163,13 +168,20 @@ function playOnce(source: string): Promise<void> {
   })
 }
 
+function waitRepeatDelay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds))
+}
+
 async function playCurrent(repetitions = autoRepeat.value ? AUTO_REPETITIONS : 1): Promise<void> {
   if (!currentQuestion.value || audioLoading.value) return
   audioLoading.value = true
   audioError.value = ''
   try {
     const safeRepetitions = Math.min(Math.max(repetitions, 1), 3)
-    for (let index = 0; index < safeRepetitions; index += 1) await playOnce(currentQuestion.value.audio.path)
+    for (let index = 0; index < safeRepetitions; index += 1) {
+      await playOnce(currentQuestion.value.audio.path)
+      if (index < safeRepetitions - 1 && repeatDelayMs.value > 0) await waitRepeatDelay(repeatDelayMs.value)
+    }
     hasPlayed.value = true
   } catch {
     audioError.value = 'Não foi possível reproduzir esta gravação humana.'
@@ -200,7 +212,7 @@ function resetQuestion(): void {
 async function startSession(): Promise<void> {
   if (!catalogReady.value) return
   cancelAutomation()
-  questions.value = buildQuestions(Math.min(requestedCards.value, Math.max(sentencePracticeCatalog.length, requestedCards.value)))
+  questions.value = buildQuestions(requestedCards.value)
   currentIndex.value = 0
   sessionPerfect.value = 0
   sessionCorrectSyllables.value = 0
@@ -296,7 +308,7 @@ onBeforeUnmount(cancelAutomation)
       <div class="sentence-setup-copy">
         <p class="eyebrow">Frases</p>
         <h2>Identifique cada sílaba dentro de uma frase real</h2>
-        <p>Escolha se quer treinar iniciais, finais ou tons. As frases usam gravações humanas do Tatoeba e o áudio pode tocar automaticamente três vezes.</p>
+        <p>Escolha se quer treinar iniciais, finais ou tons. Quantidade, repetição e modo estudo seguem as Configurações de FlashCard salvas neste navegador.</p>
       </div>
 
       <div class="sentence-mode-tabs" role="radiogroup" aria-label="Tipo de identificação">
