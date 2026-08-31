@@ -19,6 +19,8 @@ const EXPORT_URLS = {
   cmnAudio: 'https://downloads.tatoeba.org/exports/per_language/cmn/cmn_sentences_with_audio.tsv.bz2',
   cmnTranscriptions: 'https://downloads.tatoeba.org/exports/per_language/cmn/cmn_transcriptions.tsv.bz2',
   cmnPortugueseLinks: 'https://downloads.tatoeba.org/exports/per_language/cmn/cmn-por_links.tsv.bz2',
+  cmnEnglishLinks: 'https://downloads.tatoeba.org/exports/per_language/cmn/cmn-eng_links.tsv.bz2',
+  englishPortugueseLinks: 'https://downloads.tatoeba.org/exports/per_language/eng/eng-por_links.tsv.bz2',
   portugueseSentences: 'https://downloads.tatoeba.org/exports/per_language/por/por_sentences.tsv.bz2',
 }
 
@@ -138,7 +140,7 @@ async function downloadExport(url, label) {
 
   const response = await fetchWithRetry(url, {
     redirect: 'error',
-    headers: { Accept: 'application/octet-stream', 'User-Agent': 'learning-mandarin-static-sync/3.1' },
+    headers: { Accept: 'application/octet-stream', 'User-Agent': 'learning-mandarin-static-sync/3.2' },
   }, label)
   if (!response.ok) throw new Error(`${label}: HTTP ${response.status}`)
 
@@ -228,34 +230,71 @@ function parseTranscriptionMap(text) {
   return new Map([...result].map(([id, value]) => [id, value.text]))
 }
 
-function parsePortugueseLinks(text) {
+function parseLinks(text) {
+  const result = new Map()
+  for (const columns of rows(text)) {
+    const sourceId = Number(columns[0])
+    const targetId = Number(columns[1])
+    if (!Number.isSafeInteger(sourceId) || !Number.isSafeInteger(targetId)) continue
+    const targets = result.get(sourceId) ?? []
+    if (!targets.includes(targetId)) targets.push(targetId)
+    result.set(sourceId, targets)
+  }
+  return result
+}
+
+function buildPortugueseTargets(directLinks, cmnEnglishLinks, englishPortugueseLinks, sentenceIds) {
   const result = new Map()
   const wantedPortugueseIds = new Set()
-  for (const columns of rows(text)) {
-    const mandarinId = Number(columns[0])
-    const portugueseId = Number(columns[1])
-    if (!Number.isSafeInteger(mandarinId) || !Number.isSafeInteger(portugueseId)) continue
-    if (!result.has(mandarinId)) result.set(mandarinId, portugueseId)
-    wantedPortugueseIds.add(portugueseId)
+  let directCount = 0
+  let bridgedCount = 0
+
+  for (const sentenceId of sentenceIds) {
+    const direct = directLinks.get(sentenceId) ?? []
+    if (direct.length) {
+      result.set(sentenceId, direct)
+      direct.forEach((id) => wantedPortugueseIds.add(id))
+      directCount += 1
+      continue
+    }
+
+    const viaEnglish = []
+    for (const englishId of cmnEnglishLinks.get(sentenceId) ?? []) {
+      for (const portugueseId of englishPortugueseLinks.get(englishId) ?? []) {
+        if (!viaEnglish.includes(portugueseId)) viaEnglish.push(portugueseId)
+        if (viaEnglish.length >= 5) break
+      }
+      if (viaEnglish.length >= 5) break
+    }
+    if (!viaEnglish.length) continue
+    result.set(sentenceId, viaEnglish)
+    viaEnglish.forEach((id) => wantedPortugueseIds.add(id))
+    bridgedCount += 1
   }
-  return { links: result, wantedPortugueseIds }
+
+  return { result, wantedPortugueseIds, directCount, bridgedCount }
 }
 
 async function collectSentences() {
-  const [cmnText, cc0Text, audioText, transcriptionText, linksText] = await Promise.all([
+  const [cmnText, cc0Text, audioText, transcriptionText, directLinksText, cmnEnglishText, englishPortugueseText] = await Promise.all([
     loadExport(EXPORT_URLS.cmnSentences, 'Frases em mandarim'),
     loadExport(EXPORT_URLS.cmnSentencesCc0, 'Licenças CC0 em mandarim'),
     loadExport(EXPORT_URLS.cmnAudio, 'Metadados de áudio em mandarim'),
     loadExport(EXPORT_URLS.cmnTranscriptions, 'Transcrições em Pinyin'),
     loadExport(EXPORT_URLS.cmnPortugueseLinks, 'Links mandarim-português'),
+    loadExport(EXPORT_URLS.cmnEnglishLinks, 'Links mandarim-inglês'),
+    loadExport(EXPORT_URLS.englishPortugueseLinks, 'Links inglês-português'),
   ])
 
   const audioBySentence = parseAudioMap(audioText)
   const transcriptionBySentence = parseTranscriptionMap(transcriptionText)
   const cc0Ids = parseCc0Ids(cc0Text)
-  const { links, wantedPortugueseIds } = parsePortugueseLinks(linksText)
+  const directLinks = parseLinks(directLinksText)
+  const cmnEnglishLinks = parseLinks(cmnEnglishText)
+  const englishPortugueseLinks = parseLinks(englishPortugueseText)
+  const translations = buildPortugueseTargets(directLinks, cmnEnglishLinks, englishPortugueseLinks, audioBySentence.keys())
   const portugueseText = await loadExport(EXPORT_URLS.portugueseSentences, 'Frases em português')
-  const portugueseById = parseSentenceMap(portugueseText, wantedPortugueseIds)
+  const portugueseById = parseSentenceMap(portugueseText, translations.wantedPortugueseIds)
 
   const candidates = []
   const rejected = { fetched: 0, translation: 0, transcription: 0, length: 0, final: 0, audio: 0 }
@@ -270,8 +309,9 @@ async function collectSentences() {
     const audio = audioBySentence.get(sentenceId)
     if (!audio) { rejected.audio += 1; continue }
 
-    const portugueseId = links.get(sentenceId)
-    const translationPt = portugueseId ? portugueseById.get(portugueseId) ?? '' : ''
+    const translationPt = (translations.result.get(sentenceId) ?? [])
+      .map((portugueseId) => portugueseById.get(portugueseId) ?? '')
+      .find(Boolean) ?? ''
     if (!translationPt) { rejected.translation += 1; continue }
 
     const transcription = transcriptionBySentence.get(sentenceId) ?? ''
@@ -311,6 +351,7 @@ async function collectSentences() {
 
   candidates.sort((left, right) => left.syllables.length - right.syllables.length || left.id - right.id)
   const accepted = candidates.slice(0, TARGET_SENTENCES)
+  console.log(`Traduções disponíveis entre áudios licenciados: diretas=${translations.directCount}; via inglês=${translations.bridgedCount}.`)
   console.log(`Triagem dos exports Tatoeba: ${JSON.stringify(rejected)}; áudios licenciados=${audioBySentence.size}; elegíveis=${candidates.length}; selecionadas=${accepted.length}.`)
   return accepted
 }
