@@ -1,4 +1,4 @@
-# Valida segurança, tipos, testes E2E e build com dados determinísticos antes de integrar alterações.
+# Valida segurança, sincronização pelos exports oficiais, tipos, testes E2E e build antes de integrar alterações.
 name: Validação do projeto
 
 on:
@@ -34,6 +34,7 @@ jobs:
           node --check scripts/sync-sentence-audio.mjs
           node --check scripts/generate-sentence-fixture.mjs
           node --check scripts/sync-radicals.mjs
+          command -v bzip2
 
       - name: Gerar catálogo web de áudio humano
         run: npm run audio:web-catalog
@@ -41,8 +42,8 @@ jobs:
       - name: Baixar áudios humanos dos pares tonais
         run: npm run tone-pairs:sync
 
-      - name: Gerar frases determinísticas para os testes
-        run: npm run phrases:fixture
+      - name: Gerar frases humanas pelos exports oficiais do Tatoeba
+        run: npm run phrases:sync
 
       - name: Gerar catálogo de radicais
         run: npm run radicals:sync
