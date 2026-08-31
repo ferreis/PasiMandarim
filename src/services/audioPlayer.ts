@@ -10,7 +10,7 @@ function resolveAudioUrl(audioUrl: string): string {
   return `${import.meta.env.BASE_URL}${relativePath}`
 }
 
-function stopActiveAudio(): void {
+export function stopHumanAudio(): void {
   if (activeAudio) {
     activeAudio.pause()
     activeAudio.currentTime = 0
@@ -25,7 +25,7 @@ export async function playHumanAudio(sample: HumanAudioSample): Promise<void> {
     throw new Error('O áudio de referência precisa ser uma gravação humana verificada.')
   }
 
-  stopActiveAudio()
+  stopHumanAudio()
 
   const audio = new Audio(resolveAudioUrl(sample.audioUrl))
   audio.preload = 'auto'
