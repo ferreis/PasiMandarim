@@ -7,6 +7,7 @@ import './tone-symbols.css'
 import './tone-study-mode.css'
 import './sentence-trainer.css'
 import './pronunciation.css'
+import './flashcard-shared-settings.css'
 import './layout.css'
 
 createApp(App).mount('#app')
