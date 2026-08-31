@@ -16,7 +16,8 @@ async function mockAudio(page: import('@playwright/test').Page) {
 test('abre o treino de frases com os três modos', async ({ page }) => {
   await page.goto('/#/sentences')
 
-  await expect(page.getByRole('heading', { name: 'Treino auditivo com frases' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Flashcards auditivos' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: /Frases/ })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('button', { name: 'Iniciais' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Finais' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Tons' })).toBeVisible()
