@@ -1,4 +1,4 @@
-# Gera os catálogos estáticos, valida o projeto e publica o build no GitHub Pages.
+# Gera catálogos a partir de fontes estáticas, valida o projeto e publica o build no GitHub Pages.
 name: Publicação do site estático
 
 on:
@@ -19,7 +19,7 @@ jobs:
   build:
     name: Preparar site estático
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 20
     steps:
       - name: Baixar código
         uses: actions/checkout@v7
@@ -38,23 +38,8 @@ jobs:
       - name: Baixar áudios humanos dos pares tonais
         run: npm run tone-pairs:sync
 
-      - name: Baixar frases humanas para treino auditivo
-        shell: bash
-        run: |
-          set -euo pipefail
-          for tentativa in 1 2; do
-            if npm run phrases:sync; then
-              exit 0
-            fi
-
-            if [ "$tentativa" -eq 2 ]; then
-              echo "Falha ao sincronizar as frases humanas após duas execuções completas."
-              exit 1
-            fi
-
-            echo "Tatoeba indisponível ou instável. Nova tentativa em 20 segundos."
-            sleep 20
-          done
+      - name: Gerar frases humanas pelos exports oficiais do Tatoeba
+        run: npm run phrases:sync
 
       - name: Gerar catálogo de radicais
         run: npm run radicals:sync
