@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import FlashcardTrainer from './FlashcardTrainer.vue'
 
 const TonePairTrainer = defineAsyncComponent(() => import('./TonePairTrainer.vue'))
@@ -9,7 +9,7 @@ const FlashcardSettings = defineAsyncComponent(() => import('./FlashcardSettings
 
 type FlashcardCategory = 'comparison' | 'tones' | 'sentences' | 'pronunciation' | 'settings'
 
-defineProps<{
+const props = defineProps<{
   activeCategory: FlashcardCategory
 }>()
 
@@ -20,6 +20,14 @@ const categories: { id: FlashcardCategory; label: string; href: string }[] = [
   { id: 'pronunciation', label: 'Pronúncia', href: '#/flashcards/pronunciation' },
   { id: 'settings', label: 'Configurações de FlashCard', href: '#/flashcards/settings' },
 ]
+
+const activeComponent = computed(() => {
+  if (props.activeCategory === 'tones') return TonePairTrainer
+  if (props.activeCategory === 'sentences') return SentenceTrainer
+  if (props.activeCategory === 'pronunciation') return PronunciationCoach
+  if (props.activeCategory === 'settings') return FlashcardSettings
+  return FlashcardTrainer
+})
 </script>
 
 <template>
@@ -45,11 +53,9 @@ const categories: { id: FlashcardCategory; label: string; href: string }[] = [
       </nav>
     </section>
 
-    <FlashcardTrainer v-show="activeCategory === 'comparison'" />
-    <TonePairTrainer v-show="activeCategory === 'tones'" />
-    <SentenceTrainer v-show="activeCategory === 'sentences'" />
-    <PronunciationCoach v-show="activeCategory === 'pronunciation'" />
-    <FlashcardSettings v-show="activeCategory === 'settings'" />
+    <KeepAlive>
+      <component :is="activeComponent" />
+    </KeepAlive>
   </section>
 </template>
 
