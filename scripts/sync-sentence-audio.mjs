@@ -1,21 +1,17 @@
-import { existsSync } from 'node:fs'
-import { mkdir, writeFile } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
+import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 
 const ROOT = process.cwd()
-const OUTPUT_DIR = path.join(ROOT, 'public', 'audio', 'tatoeba')
 const CATALOG_PATH = path.join(ROOT, 'src', 'data', 'generatedSentenceCatalog.ts')
 const TARGET_SENTENCES = 30
-const MAX_AUDIO_BYTES = 5 * 1024 * 1024
 const MAX_EXPORT_BYTES = 25 * 1024 * 1024
 const MAX_DECOMPRESSED_BYTES = 128 * 1024 * 1024
 const FETCH_ATTEMPTS = 3
 const FETCH_TIMEOUT_MS = 60_000
-const DOWNLOAD_CONCURRENCY = 4
 const EXPORT_HOST = 'downloads.tatoeba.org'
-const ALLOWED_AUDIO_HOSTS = new Set(['tatoeba.org', 'www.tatoeba.org', 'audio.tatoeba.org'])
+const AUDIO_ORIGIN = 'https://audio.tatoeba.org'
 
 const EXPORT_URLS = {
   cmnSentences: 'https://downloads.tatoeba.org/exports/per_language/cmn/cmn_sentences.tsv.bz2',
@@ -133,7 +129,7 @@ async function downloadExport(url, label) {
 
   const response = await fetchWithRetry(url, {
     redirect: 'error',
-    headers: { Accept: 'application/octet-stream', 'User-Agent': 'learning-mandarin-static-sync/2.0' },
+    headers: { Accept: 'application/octet-stream', 'User-Agent': 'learning-mandarin-static-sync/3.0' },
   }, label)
   if (!response.ok) throw new Error(`${label}: HTTP ${response.status}`)
 
@@ -153,9 +149,7 @@ function decompressBzip2(buffer, label) {
     encoding: 'utf8',
     maxBuffer: MAX_DECOMPRESSED_BYTES,
   })
-  if (result.error?.code === 'ENOENT') {
-    throw new Error(`${label}: o comando bzip2 não está instalado.`)
-  }
+  if (result.error?.code === 'ENOENT') throw new Error(`${label}: o comando bzip2 não está instalado.`)
   if (result.error) throw new Error(`${label}: falha ao descompactar (${result.error.message}).`)
   if (result.status !== 0) throw new Error(`${label}: bzip2 terminou com código ${result.status}.`)
   return result.stdout
@@ -190,15 +184,27 @@ function parseCc0Ids(text) {
 }
 
 function parseAudioMap(text) {
-  const result = new Map()
+  const allBySentence = new Map()
+
   for (const columns of rows(text)) {
     const sentenceId = Number(columns[0])
     const audioId = Number(columns[1])
     const author = String(columns[2] ?? '').trim()
     const license = String(columns[3] ?? '').trim()
     const attributionUrl = String(columns.slice(4).join('\t') ?? '').trim()
-    if (!Number.isSafeInteger(sentenceId) || !Number.isSafeInteger(audioId) || !author || !reusableLicense(license)) continue
-    if (!result.has(sentenceId)) result.set(sentenceId, { id: audioId, author, license, attributionUrl })
+    if (!Number.isSafeInteger(sentenceId) || !Number.isSafeInteger(audioId)) continue
+
+    const entries = allBySentence.get(sentenceId) ?? []
+    entries.push({ id: audioId, author, license, attributionUrl })
+    allBySentence.set(sentenceId, entries)
+  }
+
+  const result = new Map()
+  for (const [sentenceId, entries] of allBySentence) {
+    if (entries.length !== 1) continue
+    const audio = entries[0]
+    if (!audio.author || !reusableLicense(audio.license)) continue
+    result.set(sentenceId, audio)
   }
   return result
 }
@@ -289,7 +295,7 @@ async function collectSentences() {
       syllables,
       audio: {
         id: audio.id,
-        path: `/audio/tatoeba/${audio.id}.mp3`,
+        path: `${AUDIO_ORIGIN}/sentences/cmn/${sentenceId}.mp3`,
         author: audio.author,
         license: audio.license,
         attributionUrl: audio.attributionUrl || `https://tatoeba.org/users/profile/${encodeURIComponent(audio.author)}`,
@@ -305,56 +311,12 @@ async function collectSentences() {
   return accepted
 }
 
-async function downloadAudio(item) {
-  const destination = path.join(OUTPUT_DIR, `${item.audio.id}.mp3`)
-  if (existsSync(destination)) return
-
-  const url = `https://tatoeba.org/audio/download/${item.audio.id}`
-  const response = await fetchWithRetry(url, {
-    redirect: 'follow',
-    credentials: 'omit',
-    headers: { 'User-Agent': 'learning-mandarin-static-sync/2.0' },
-  }, `Áudio ${item.audio.id}`)
-  if (!response.ok) throw new Error(`Áudio ${item.audio.id}: HTTP ${response.status}`)
-
-  const finalUrl = new URL(response.url)
-  if (finalUrl.protocol !== 'https:' || !ALLOWED_AUDIO_HOSTS.has(finalUrl.hostname)) {
-    throw new Error(`Áudio ${item.audio.id}: redirecionamento não permitido para ${finalUrl.hostname}`)
-  }
-
-  const contentType = response.headers.get('content-type') ?? ''
-  if (!contentType.startsWith('audio/') && !contentType.includes('octet-stream')) {
-    throw new Error(`Áudio ${item.audio.id}: tipo inesperado ${contentType}`)
-  }
-  const declaredSize = Number(response.headers.get('content-length') ?? 0)
-  if (declaredSize > MAX_AUDIO_BYTES) throw new Error(`Áudio ${item.audio.id}: arquivo excede o limite permitido.`)
-
-  const buffer = Buffer.from(await response.arrayBuffer())
-  if (!buffer.length || buffer.length > MAX_AUDIO_BYTES) throw new Error(`Áudio ${item.audio.id}: tamanho inválido (${buffer.length}).`)
-  await writeFile(destination, buffer, { mode: 0o644 })
-}
-
-async function downloadAudios(items) {
-  let cursor = 0
-  async function worker() {
-    while (cursor < items.length) {
-      const item = items[cursor]
-      cursor += 1
-      await downloadAudio(item)
-    }
-  }
-  const workers = Math.min(DOWNLOAD_CONCURRENCY, items.length)
-  await Promise.all(Array.from({ length: workers }, () => worker()))
-}
-
 function catalogSource(items) {
   return `// Arquivo gerado por scripts/sync-sentence-audio.mjs a partir dos exports semanais do Tatoeba. Não edite manualmente.\n\nexport type SentenceSyllable = {\n  hanzi: string\n  pinyin: string\n  numbered: string\n  initial: string\n  final: string\n  tone: number\n}\n\nexport type SentencePracticeItem = {\n  id: number\n  text: string\n  translationPt: string\n  pinyin: string\n  syllables: SentenceSyllable[]\n  audio: { id: number; path: string; author: string; license: string; attributionUrl: string }\n  sourceUrl: string\n  textLicense: string\n}\n\nexport const sentencePracticeCatalog: SentencePracticeItem[] = ${JSON.stringify(items, null, 2)}\n`
 }
 
-await mkdir(OUTPUT_DIR, { recursive: true })
 const items = await collectSentences()
 if (items.length < 10) throw new Error(`Catálogo de frases insuficiente: apenas ${items.length} frases elegíveis encontradas.`)
-await downloadAudios(items)
 await writeFile(CATALOG_PATH, catalogSource(items), 'utf8')
 console.log(`Frases humanas: ${items.length}. Sílabas: ${items.reduce((sum, item) => sum + item.syllables.length, 0)}.`)
-console.log(`Falantes: ${new Set(items.map((item) => item.audio.author)).size}. Fonte: exports semanais do Tatoeba.`)
+console.log(`Falantes: ${new Set(items.map((item) => item.audio.author)).size}. Fonte: exports semanais do Tatoeba; áudio servido pelo host estático oficial.`)
