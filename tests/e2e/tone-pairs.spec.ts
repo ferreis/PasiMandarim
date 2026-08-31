@@ -25,6 +25,15 @@ async function useDeterministicRandom(page: import('@playwright/test').Page) {
   })
 }
 
+async function useSettings(
+  page: import('@playwright/test').Page,
+  settings: { quantity: number; autoRepeat: boolean; studyMode: boolean; repeatDelayMs: number },
+) {
+  await page.addInitScript((value) => {
+    localStorage.setItem('learning-mandarin:flashcard-settings:v1', JSON.stringify(value))
+  }, settings)
+}
+
 async function keepOnlyFirstTone(page: import('@playwright/test').Page, selectedTone: number) {
   const group = page.locator('.tone-selector-grid fieldset').nth(0)
   for (const tone of [1, 2, 3, 4]) {
@@ -59,7 +68,7 @@ test('mostra os símbolos e números dos cinco tons', async ({ page }) => {
   await expect(secondToneGroup).toContainText('Neutro')
 })
 
-test('mostra como respostas somente os tons escolhidos na configuração', async ({ page }) => {
+test('mostra como respostas somente os tons escolhidos', async ({ page }) => {
   await mockAudio(page)
   await page.goto('/#/tones')
 
@@ -87,6 +96,7 @@ test('mostra como respostas somente os tons escolhidos na configuração', async
 
 test('reproduz a palavra três vezes automaticamente ao iniciar', async ({ page }) => {
   await mockAudio(page)
+  await useSettings(page, { quantity: 10, autoRepeat: true, studyMode: false, repeatDelayMs: 0 })
   await page.goto('/#/tones')
 
   await startAndWaitForAudio(page)
@@ -96,36 +106,19 @@ test('reproduz a palavra três vezes automaticamente ao iniciar', async ({ page 
   expect(size).toBeGreaterThanOrEqual(30)
 })
 
-test('mantém as opções de reprodução editáveis durante a sessão', async ({ page }) => {
-  await mockAudio(page)
-  await page.goto('/#/tones')
-  await startAndWaitForAudio(page)
-
-  const autoRepeat = page.locator('.tone-study-options input').nth(0)
-  const studyMode = page.locator('.tone-study-options input').nth(1)
-
-  await expect(autoRepeat).toBeEnabled()
-  await expect(studyMode).toBeEnabled()
-
-  await autoRepeat.uncheck()
-  await expect(autoRepeat).not.toBeChecked()
-
-  await studyMode.check()
-  await expect(studyMode).toBeChecked()
-  await expect(page.getByRole('button', { name: 'Parar modo automático' })).toBeVisible()
-
-  await studyMode.uncheck()
-  await expect(studyMode).not.toBeChecked()
-  await expect(page.getByRole('button', { name: 'Parar modo automático' })).toBeHidden()
-  await expect(page.getByRole('alert')).toContainText('Modo automático desativado')
+test('não exibe configurações gerais duplicadas na tela de tons', async ({ page }) => {
+  await page.goto('/#/flashcards/tones')
+  await expect(page.locator('.tone-study-options')).toBeHidden()
+  await expect(page.locator('.tone-session-row > label')).toBeHidden()
+  await expect(page.getByText('Configuração', { exact: true })).toBeHidden()
 })
 
 test('treina um par tonal selecionado e salva o resultado no navegador', async ({ page }) => {
   await mockAudio(page)
   await page.goto('/#/tones')
 
-  await expect(page.getByRole('heading', { name: 'Flashcards auditivos' })).toBeVisible()
-  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: /Tons/ })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('heading', { name: 'Flashcards' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: 'Tons' })).toHaveAttribute('aria-current', 'page')
 
   await keepOnlyFirstTone(page, 1)
   await keepOnlySecondTone(page, 1)
@@ -202,20 +195,18 @@ test('permite mostrar a resposta sem contaminar o histórico de desempenho', asy
   expect(stored).toBeNull()
 })
 
-test('modo estudo automático revela sem exigir resposta do usuário', async ({ page }) => {
+test('modo estudo automático usa a configuração global e revela sem exigir resposta', async ({ page }) => {
   test.setTimeout(12_000)
   await mockAudio(page)
+  await useSettings(page, { quantity: 5, autoRepeat: true, studyMode: true, repeatDelayMs: 0 })
   await page.goto('/#/tones')
 
-  await page.locator('.tone-study-options label').nth(1).locator('input').check()
   await page.getByRole('button', { name: 'Iniciar treino' }).click()
 
   await expect(page.getByRole('button', { name: 'Parar modo automático' })).toBeVisible()
   await expect(page.getByText('Resposta revelada.', { exact: true })).toBeVisible({ timeout: 4_000 })
   const stored = await page.evaluate(() => localStorage.getItem('learning-mandarin:tone-pair-attempts:v1'))
   expect(stored).toBeNull()
-  await page.getByRole('button', { name: 'Parar modo automático' }).click()
-  await expect(page.getByRole('alert')).toContainText('Modo automático interrompido')
 })
 
 test('explica o sandhi quando o par lexical é 3–3', async ({ page }) => {
