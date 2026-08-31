@@ -1,0 +1,18 @@
+/* As preferências gerais ficam exclusivamente na aba Configurações de FlashCard. */
+.flashcard-setup > div:first-child > p,
+.tone-setup-copy .eyebrow,
+.tone-setup-copy > p:last-child,
+.tone-study-options,
+.tone-session-row > label,
+.sentence-setup-copy .eyebrow,
+.sentence-setup-copy > p:last-child,
+.sentence-controls > label,
+.pronunciation-intro .eyebrow,
+.pronunciation-intro > p:last-child {
+  display: none !important;
+}
+
+.tone-session-row,
+.sentence-controls {
+  align-items: center;
+}
