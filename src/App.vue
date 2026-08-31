@@ -56,15 +56,13 @@ onMounted(() => window.addEventListener('hashchange', syncRouteWithHash))
 onBeforeUnmount(() => window.removeEventListener('hashchange', syncRouteWithHash))
 
 const heroTitle = computed(() => {
-  if (activeTab.value === 'flashcards') return 'Flashcards auditivos'
+  if (activeTab.value === 'flashcards') return 'Flashcards'
   if (activeTab.value === 'radicals') return 'Radicais chineses'
   return 'Treino auditivo de Pinyin'
 })
 
 const heroCopy = computed(() => {
-  if (activeTab.value === 'flashcards') {
-    return 'Escolha o tipo de treino, ajuste suas configurações e gere sessões para praticar comparação de iniciais, tons, frases ou pronúncia.'
-  }
+  if (activeTab.value === 'flashcards') return ''
   if (activeTab.value === 'radicals') {
     return 'Explore os 214 radicais Kangxi por símbolo, Pinyin, significado, número de traços, variantes e evidências históricas verificáveis.'
   }
@@ -78,7 +76,7 @@ const heroCopy = computed(() => {
   <main class="page-shell">
     <section class="hero">
       <h1>{{ heroTitle }}</h1>
-      <p class="hero-copy">{{ heroCopy }}</p>
+      <p v-if="heroCopy" class="hero-copy">{{ heroCopy }}</p>
     </section>
 
     <ComparisonTrainer v-if="activeTab === 'comparison'" />

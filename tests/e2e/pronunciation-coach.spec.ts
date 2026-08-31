@@ -3,9 +3,10 @@ import { expect, test } from '@playwright/test'
 test('abre o corretor com referência do catálogo web publicado', async ({ page }) => {
   await page.goto('/#/pronunciation')
 
-  await expect(page.getByRole('heading', { name: 'Flashcards auditivos' })).toBeVisible()
-  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: /Pronúncia/ })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('heading', { name: 'Flashcards', exact: true })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: 'Pronúncia' })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('heading', { name: 'Compare sua pronúncia com uma gravação humana' })).toBeVisible()
+  await expect(page.getByText('Corretor local', { exact: true })).toBeHidden()
   await expect(page.getByText(/não é enviado ao GitHub nem salvo pelo projeto/i)).toBeVisible()
   await expect(page.getByRole('button', { name: '▶ Ouvir referência' })).toBeVisible()
   await expect(page.getByRole('button', { name: '● Gravar pronúncia' })).toBeEnabled()

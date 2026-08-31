@@ -11,7 +11,6 @@ import {
 <template>
   <section class="trainer-card flashcard-settings" aria-labelledby="flashcard-settings-title">
     <div class="flashcard-settings-heading">
-      <p class="eyebrow">Configurações de FlashCard</p>
       <h2 id="flashcard-settings-title">Preferências dos treinos</h2>
       <p>Estas escolhas são salvas automaticamente neste navegador e reutilizadas nas sessões de flashcards.</p>
     </div>
@@ -40,7 +39,7 @@ import {
       <label v-if="flashcardSettings.autoRepeat" class="flashcard-setting-row">
         <span>
           <strong>Tempo entre as repetições</strong>
-          <small>Pausa inserida entre um áudio e o próximo durante a reprodução automática 3×.</small>
+          <small>Pausa entre uma reprodução e a próxima durante a repetição automática 3×.</small>
         </span>
         <select v-model.number="flashcardSettings.repeatDelayMs" aria-label="Tempo entre as repetições automáticas">
           <option v-for="delay in flashcardRepeatDelayOptions" :key="delay" :value="delay">
@@ -66,5 +65,5 @@ import {
 </template>
 
 <style scoped>
-.flashcard-settings{display:grid;gap:24px;max-width:960px;margin:0 auto}.flashcard-settings-heading{display:grid;gap:6px}.flashcard-settings-heading h2{margin:0;font-size:clamp(1.35rem,2vw,1.75rem)}.flashcard-settings-heading p:last-child{margin:0;color:#62707d;line-height:1.6}.flashcard-settings-list{display:grid;border:1px solid #d9e0e7;border-radius:18px;overflow:hidden}.flashcard-setting-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,220px);align-items:center;gap:24px;padding:20px;background:#fff}.flashcard-setting-row+.flashcard-setting-row{border-top:1px solid #e5eaef}.flashcard-setting-row>span{display:grid;gap:5px}.flashcard-setting-row strong{font-size:1rem}.flashcard-setting-row small{color:#62707d;line-height:1.5}.flashcard-setting-row select{width:100%;min-height:44px}.flashcard-setting-toggle{grid-template-columns:minmax(0,1fr) auto}.flashcard-setting-toggle input{width:24px;height:24px;accent-color:#17202a}.flashcard-settings-footer{display:flex;align-items:center;justify-content:space-between;gap:20px}.flashcard-settings-footer p{margin:0;color:#62707d;font-size:.9rem}.flashcard-settings-footer button{min-height:42px;padding:0 16px;border:1px solid #cbd4dc;border-radius:12px;background:#fff;color:#17202a;font-weight:700;cursor:pointer}.flashcard-settings-footer button:hover{background:#f5f7f9}@media(max-width:680px){.flashcard-setting-row,.flashcard-setting-toggle{grid-template-columns:1fr;gap:12px}.flashcard-setting-toggle input{justify-self:start}.flashcard-settings-footer{align-items:flex-start;flex-direction:column}}
+.flashcard-settings{display:grid;gap:24px;max-width:960px;margin:0 auto}.flashcard-settings-heading{display:grid;gap:6px}.flashcard-settings-heading h2{margin:0;font-size:clamp(1.35rem,2vw,1.75rem)}.flashcard-settings-heading p{margin:0;color:#62707d;line-height:1.6}.flashcard-settings-list{display:grid;border:1px solid #d9e0e7;border-radius:18px;overflow:hidden}.flashcard-setting-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,220px);align-items:center;gap:24px;padding:20px;background:#fff}.flashcard-setting-row+.flashcard-setting-row{border-top:1px solid #e5eaef}.flashcard-setting-row>span{display:grid;gap:5px}.flashcard-setting-row strong{font-size:1rem}.flashcard-setting-row small{color:#62707d;line-height:1.5}.flashcard-setting-row select{width:100%;min-height:44px}.flashcard-setting-toggle{grid-template-columns:minmax(0,1fr) auto}.flashcard-setting-toggle input{width:24px;height:24px;accent-color:#17202a}.flashcard-settings-footer{display:flex;align-items:center;justify-content:space-between;gap:20px}.flashcard-settings-footer p{margin:0;color:#62707d;font-size:.9rem}.flashcard-settings-footer button{min-height:42px;padding:0 16px;border:1px solid #cbd4dc;border-radius:12px;background:#fff;color:#17202a;font-weight:700;cursor:pointer}.flashcard-settings-footer button:hover{background:#f5f7f9}@media(max-width:680px){.flashcard-setting-row,.flashcard-setting-toggle{grid-template-columns:1fr;gap:12px}.flashcard-setting-toggle input{justify-self:start}.flashcard-settings-footer{align-items:flex-start;flex-direction:column}}
 </style>

@@ -1,0 +1,32 @@
+.flashcard-setup > div:first-child > p,
+.tone-setup-copy .eyebrow,
+.tone-setup-copy > p:last-child,
+.tone-study-options,
+.tone-session-row > label,
+.sentence-setup-copy .eyebrow,
+.sentence-setup-copy > p:last-child,
+.sentence-controls > label,
+.pronunciation-intro .eyebrow,
+.pronunciation-intro > p:last-child {
+  display: none !important;
+}
+
+.flashcard-setup-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+}
+
+.tone-session-row,
+.sentence-controls {
+  align-items: center;
+}
+
+.flashcard-result.study {
+  border-color: #ead7a0;
+  background: #fff9e8;
+}
+
+@media (max-width: 760px) {
+  .flashcard-setup-grid {
+    grid-template-columns: 1fr;
+  }
+}

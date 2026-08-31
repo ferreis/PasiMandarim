@@ -9,46 +9,51 @@ test('agrupa os exercícios e configurações dentro da área de flashcards', as
 
   const categoryNav = page.getByRole('navigation', { name: 'Categorias de flashcards' })
   await expect(categoryNav.getByRole('link')).toHaveText([
-    /Comparação/,
-    /Tons/,
-    /Frases/,
-    /Pronúncia/,
-    /Configurações/,
+    'Comparação',
+    'Tons',
+    'Frases',
+    'Pronúncia',
+    'Configurações de FlashCard',
   ])
-  await expect(categoryNav.getByRole('link', { name: /Comparação/ })).toHaveAttribute('aria-current', 'page')
+  await expect(categoryNav.getByRole('link', { name: 'Comparação' })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByText('Identifique qual das duas iniciais foi pronunciada.', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Identifique os tons de palavras humanas de duas sílabas.', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Treine iniciais, finais ou tons em cada sílaba de uma frase.', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Gere alvos e compare sua voz com gravações humanas.', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('Defina quantidade, repetição automática, intervalo e modo estudo.', { exact: true })).toHaveCount(0)
 })
 
 test('troca de categoria sem sair de flashcards', async ({ page }) => {
   await page.goto('/#/flashcards')
 
   const categoryNav = page.getByRole('navigation', { name: 'Categorias de flashcards' })
-  await categoryNav.getByRole('link', { name: /Tons/ }).click()
+  await categoryNav.getByRole('link', { name: 'Tons' }).click()
   await expect(page).toHaveURL(/#\/flashcards\/tones$/)
   await expect(page.locator('.tone-selector-grid')).toBeVisible()
 
-  await categoryNav.getByRole('link', { name: /Frases/ }).click()
+  await categoryNav.getByRole('link', { name: 'Frases' }).click()
   await expect(page).toHaveURL(/#\/flashcards\/sentences$/)
   await expect(page.getByRole('button', { name: 'Iniciar sessão' })).toBeVisible()
 
-  await categoryNav.getByRole('link', { name: /Pronúncia/ }).click()
+  await categoryNav.getByRole('link', { name: 'Pronúncia' }).click()
   await expect(page).toHaveURL(/#\/flashcards\/pronunciation$/)
   await expect(page.getByRole('button', { name: 'Gerar flashcards de pronúncia' })).toBeVisible()
 
-  await categoryNav.getByRole('link', { name: /Configurações/ }).click()
+  await categoryNav.getByRole('link', { name: 'Configurações de FlashCard' }).click()
   await expect(page).toHaveURL(/#\/flashcards\/settings$/)
   await expect(page.getByRole('heading', { name: 'Preferências dos treinos' })).toBeVisible()
 })
 
 test('mantém compatibilidade com as rotas antigas', async ({ page }) => {
   await page.goto('/#/tones')
-  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: /Tons/ })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: 'Tons' })).toHaveAttribute('aria-current', 'page')
   await expect(page.locator('.tone-selector-grid')).toBeVisible()
 
   await page.goto('/#/sentences')
-  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: /Frases/ })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: 'Frases' })).toHaveAttribute('aria-current', 'page')
 
   await page.goto('/#/pronunciation')
-  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: /Pronúncia/ })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: 'Pronúncia' })).toHaveAttribute('aria-current', 'page')
 })
 
 test('salva e reaplica as configurações gerais dos flashcards', async ({ page }) => {
@@ -108,11 +113,12 @@ test('descarta valores de configuração inválidos salvos no navegador', async 
 })
 
 test('gera a quantidade escolhida de flashcards de pronúncia', async ({ page }) => {
+  await page.goto('/#/flashcards/settings')
+  await page.getByLabel('Quantidade padrão de flashcards').selectOption('5')
   await page.goto('/#/flashcards/pronunciation')
 
   const quantity = page.locator('.pronunciation-session-setup select')
-  await expect(quantity).toHaveCount(1)
-  await quantity.selectOption('5')
+  await expect(quantity).toHaveValue('5')
   await page.getByRole('button', { name: 'Gerar flashcards de pronúncia' }).click()
 
   await expect(page.getByText('Flashcard 1 de 5')).toBeVisible()
