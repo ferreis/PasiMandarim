@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, toRef } from 'vue'
 import {
   findHumanAudioSample,
   getAvailableTonesForPair,
@@ -7,6 +7,10 @@ import {
 } from '../data/audioCatalog'
 import { getCommonFinals, pinyinInitials } from '../data/pinyinMatrix'
 import { playHumanAudio } from '../services/audioPlayer'
+import {
+  flashcardQuantityOptions,
+  flashcardSettings,
+} from '../services/flashcardSettings'
 import {
   buildInitialPairKey,
   clearFlashcardAttemptsForPair,
@@ -41,7 +45,9 @@ type FinalErrorSummary = {
 
 const initialA = ref('b')
 const initialB = ref('p')
-const requestedCards = ref(10)
+const requestedCards = toRef(flashcardSettings, 'quantity')
+const autoRepeat = toRef(flashcardSettings, 'autoRepeat')
+const repeatDelayMs = toRef(flashcardSettings, 'repeatDelayMs')
 const attempts = ref<FlashcardAttempt[]>(loadFlashcardAttempts())
 
 const questions = ref<FlashcardQuestion[]>([])
@@ -55,7 +61,8 @@ const sessionErrors = ref(0)
 const sessionActive = ref(false)
 const sessionFinished = ref(false)
 
-const quantityOptions = [5, 10, 20, 30, 50]
+const quantityOptions = flashcardQuantityOptions
+const AUTO_REPETITIONS = 3
 
 function displayInitial(initial: string): string {
   return initial || '∅'
@@ -80,6 +87,10 @@ function shuffle<T>(items: T[]): T[] {
     ;[result[index], result[swapIndex]] = [result[swapIndex], result[index]]
   }
   return result
+}
+
+function wait(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds))
 }
 
 const allCandidates = computed<FlashcardCandidate[]>(() => {
@@ -205,16 +216,22 @@ function startSession(): void {
   sessionErrors.value = 0
   sessionFinished.value = false
   sessionActive.value = true
+  if (autoRepeat.value) void playCurrentAudio(AUTO_REPETITIONS)
 }
 
-async function playCurrentAudio(): Promise<void> {
-  if (!currentSample.value) return
+async function playCurrentAudio(repetitions = 1): Promise<void> {
+  const sample = currentSample.value
+  if (!sample || audioLoading.value) return
 
   audioLoading.value = true
   audioError.value = ''
 
   try {
-    await playHumanAudio(currentSample.value)
+    const safeRepetitions = Math.min(Math.max(Math.trunc(repetitions), 1), AUTO_REPETITIONS)
+    for (let index = 0; index < safeRepetitions; index += 1) {
+      await playHumanAudio(sample)
+      if (index < safeRepetitions - 1 && repeatDelayMs.value > 0) await wait(repeatDelayMs.value)
+    }
     hasPlayed.value = true
   } catch {
     audioError.value = 'Não foi possível reproduzir o áudio desta questão.'
@@ -256,6 +273,7 @@ function nextQuestion(): void {
   answer.value = null
   hasPlayed.value = false
   audioError.value = ''
+  if (autoRepeat.value) void playCurrentAudio(AUTO_REPETITIONS)
 }
 
 function clearPairHistory(): void {
@@ -270,7 +288,7 @@ function clearPairHistory(): void {
         <div>
           <p class="eyebrow">Configuração</p>
           <h2>Monte sua sessão</h2>
-          <p>Escolha somente as duas iniciais e quantos flashcards quer responder. Finais e tons são sorteados automaticamente.</p>
+          <p>Escolha somente as duas iniciais. A quantidade e a reprodução automática seguem as Configurações de FlashCard salvas neste navegador.</p>
         </div>
 
         <div class="flashcard-setup-grid">
@@ -323,7 +341,7 @@ function clearPairHistory(): void {
         </div>
 
         <p class="flashcard-round-label">Qual inicial você ouviu?</p>
-        <button class="flashcard-player" type="button" @click="playCurrentAudio">
+        <button class="flashcard-player" type="button" :disabled="audioLoading" @click="playCurrentAudio()">
           {{ audioLoading ? 'Carregando…' : hasPlayed ? '▶ Ouvir novamente' : '▶ Ouvir áudio' }}
         </button>
         <p v-if="!hasPlayed" class="flashcard-hint">Ouça a gravação antes de responder.</p>

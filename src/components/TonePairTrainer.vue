@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, toRef, watch } from 'vue'
 import { tonePairKey, tonePairWords } from '../data/tonePairCatalog'
 import { toneDisplay } from '../data/toneDisplay'
+import {
+  flashcardQuantityOptions,
+  flashcardSettings,
+} from '../services/flashcardSettings'
 import { playTonePairWord, stopTonePairAudio } from '../services/tonePairAudio'
 import { clearTonePairAttempts, loadTonePairAttempts, saveTonePairAttempt } from '../services/tonePairStats'
 import type { ToneNumber, TonePairAttempt, TonePairWord } from '../types/tonePair'
@@ -12,12 +16,13 @@ type DetailedAttempt = TonePairAttempt & { tone1Correct: boolean; tone2Correct: 
 
 const firstToneOptions: FirstTone[] = [1, 2, 3, 4]
 const secondToneOptions: ToneNumber[] = [1, 2, 3, 4, 5]
-const quantityOptions = [10, 20, 40]
+const quantityOptions = flashcardQuantityOptions
 const selectedFirstTones = ref<FirstTone[]>([1, 2, 3, 4])
 const selectedSecondTones = ref<ToneNumber[]>([1, 2, 3, 4, 5])
-const requestedCards = ref(20)
-const autoRepeat = ref(true)
-const studyMode = ref(false)
+const requestedCards = toRef(flashcardSettings, 'quantity')
+const autoRepeat = toRef(flashcardSettings, 'autoRepeat')
+const studyMode = toRef(flashcardSettings, 'studyMode')
+const repeatDelayMs = toRef(flashcardSettings, 'repeatDelayMs')
 const questions = ref<TonePairWord[]>([])
 const currentIndex = ref(0)
 const answerTone1 = ref<FirstTone | null>(null)
@@ -197,7 +202,7 @@ async function playCurrent(repetitions = autoRepeat.value ? AUTO_REPETITIONS : 1
   audioLoading.value = true
   audioError.value = ''
   try {
-    await playTonePairWord(currentQuestion.value, repetitions)
+    await playTonePairWord(currentQuestion.value, repetitions, repeatDelayMs.value)
     hasPlayed.value = true
   } catch {
     audioError.value = 'Não foi possível reproduzir esta gravação humana.'
@@ -339,7 +344,7 @@ onBeforeUnmount(cancelAutomation)
       <div class="tone-setup-copy">
         <p class="eyebrow">Configuração</p>
         <h2>Escolha quais tons quer treinar</h2>
-        <p>A primeira sílaba usa os tons 1–4. A segunda pode usar 1–4 ou o tom neutro. Os símbolos mostram o contorno gráfico convencional de cada tom.</p>
+        <p>A primeira sílaba usa os tons 1–4. A segunda pode usar 1–4 ou o tom neutro. As preferências gerais desta sessão são salvas nas Configurações de FlashCard.</p>
       </div>
 
       <div class="tone-selector-grid">
@@ -406,42 +411,16 @@ onBeforeUnmount(cancelAutomation)
           <fieldset :class="{ 'syllable-correct': scoredAnswer && firstToneIsCorrect, 'syllable-wrong': scoredAnswer && !firstToneIsCorrect }">
             <legend>Tom da 1ª sílaba?</legend>
             <div class="tone-answer-buttons" :style="{ gridTemplateColumns: `repeat(${activeFirstToneOptions.length}, minmax(0, 1fr))` }">
-              <button
-                v-for="tone in activeFirstToneOptions"
-                :key="tone"
-                type="button"
-                :aria-label="toneDisplay[tone].label"
-                :disabled="!hasPlayed || answered"
-                :class="{
-                  selected: !answered && answerTone1 === tone,
-                  'answer-correct': scoredAnswer && tone === currentQuestion.tone1,
-                  'answer-wrong': scoredAnswer && answerTone1 === tone && tone !== currentQuestion.tone1,
-                }"
-                @click="answerTone1 = tone"
-              >
-                <strong class="tone-answer-number">{{ tone }}</strong>
-                <span>{{ toneDisplay[tone].symbol }} {{ toneDisplay[tone].shortLabel }}</span>
+              <button v-for="tone in activeFirstToneOptions" :key="tone" type="button" :aria-label="toneDisplay[tone].label" :disabled="!hasPlayed || answered" :class="{ selected: !answered && answerTone1 === tone, 'answer-correct': scoredAnswer && tone === currentQuestion.tone1, 'answer-wrong': scoredAnswer && answerTone1 === tone && tone !== currentQuestion.tone1 }" @click="answerTone1 = tone">
+                <strong class="tone-answer-number">{{ tone }}</strong><span>{{ toneDisplay[tone].symbol }} {{ toneDisplay[tone].shortLabel }}</span>
               </button>
             </div>
           </fieldset>
           <fieldset :class="{ 'syllable-correct': scoredAnswer && secondToneIsCorrect, 'syllable-wrong': scoredAnswer && !secondToneIsCorrect }">
             <legend>Tom da 2ª sílaba?</legend>
             <div class="tone-answer-buttons" :style="{ gridTemplateColumns: `repeat(${activeSecondToneOptions.length}, minmax(0, 1fr))` }">
-              <button
-                v-for="tone in activeSecondToneOptions"
-                :key="tone"
-                type="button"
-                :aria-label="toneDisplay[tone].label"
-                :disabled="!hasPlayed || answered"
-                :class="{
-                  selected: !answered && answerTone2 === tone,
-                  'answer-correct': scoredAnswer && tone === currentQuestion.tone2,
-                  'answer-wrong': scoredAnswer && answerTone2 === tone && tone !== currentQuestion.tone2,
-                }"
-                @click="answerTone2 = tone"
-              >
-                <strong class="tone-answer-number">{{ tone }}</strong>
-                <span>{{ toneDisplay[tone].symbol }} {{ toneDisplay[tone].shortLabel }}</span>
+              <button v-for="tone in activeSecondToneOptions" :key="tone" type="button" :aria-label="toneDisplay[tone].label" :disabled="!hasPlayed || answered" :class="{ selected: !answered && answerTone2 === tone, 'answer-correct': scoredAnswer && tone === currentQuestion.tone2, 'answer-wrong': scoredAnswer && answerTone2 === tone && tone !== currentQuestion.tone2 }" @click="answerTone2 = tone">
+                <strong class="tone-answer-number">{{ tone }}</strong><span>{{ toneDisplay[tone].symbol }} {{ toneDisplay[tone].shortLabel }}</span>
               </button>
             </div>
           </fieldset>
@@ -461,35 +440,13 @@ onBeforeUnmount(cancelAutomation)
           </div>
 
           <div class="tone-answer-comparison" aria-label="Comparação visual da resposta">
-            <section>
-              <h3>Sua resposta</h3>
-              <div class="tone-result-boxes">
-                <span :class="scoredAnswer ? (firstToneIsCorrect ? 'correct' : 'wrong') : 'empty'">{{ answerTone1 ?? '—' }}</span>
-                <span :class="scoredAnswer ? (secondToneIsCorrect ? 'correct' : 'wrong') : 'empty'">{{ answerTone2 ?? '—' }}</span>
-              </div>
-              <small>{{ revealedOnly ? 'Resposta não informada.' : '1ª e 2ª sílaba.' }}</small>
-            </section>
-            <section>
-              <h3>Resposta correta</h3>
-              <div class="tone-result-boxes">
-                <span class="correct">{{ currentQuestion.tone1 }}</span>
-                <span class="correct">{{ currentQuestion.tone2 }}</span>
-              </div>
-              <small>{{ toneDisplay[currentQuestion.tone1].symbol }} {{ toneLabel(currentQuestion.tone1) }} · {{ toneDisplay[currentQuestion.tone2].symbol }} {{ toneLabel(currentQuestion.tone2) }}</small>
-            </section>
+            <section><h3>Sua resposta</h3><div class="tone-result-boxes"><span :class="scoredAnswer ? (firstToneIsCorrect ? 'correct' : 'wrong') : 'empty'">{{ answerTone1 ?? '—' }}</span><span :class="scoredAnswer ? (secondToneIsCorrect ? 'correct' : 'wrong') : 'empty'">{{ answerTone2 ?? '—' }}</span></div><small>{{ revealedOnly ? 'Resposta não informada.' : '1ª e 2ª sílaba.' }}</small></section>
+            <section><h3>Resposta correta</h3><div class="tone-result-boxes"><span class="correct">{{ currentQuestion.tone1 }}</span><span class="correct">{{ currentQuestion.tone2 }}</span></div><small>{{ toneDisplay[currentQuestion.tone1].symbol }} {{ toneLabel(currentQuestion.tone1) }} · {{ toneDisplay[currentQuestion.tone2].symbol }} {{ toneLabel(currentQuestion.tone2) }}</small></section>
           </div>
 
           <div v-if="scoredAnswer" class="syllable-feedback-grid">
-            <article :class="firstToneIsCorrect ? 'correct' : 'wrong'">
-              <strong>1ª sílaba</strong>
-              <span>Sua resposta: {{ displayAnswer(answerTone1) }}</span>
-              <small>{{ firstToneIsCorrect ? '✓ Você acertou esta sílaba.' : `✕ O correto era ${displayAnswer(currentQuestion.tone1)}.` }}</small>
-            </article>
-            <article :class="secondToneIsCorrect ? 'correct' : 'wrong'">
-              <strong>2ª sílaba</strong>
-              <span>Sua resposta: {{ displayAnswer(answerTone2) }}</span>
-              <small>{{ secondToneIsCorrect ? '✓ Você acertou esta sílaba.' : `✕ O correto era ${displayAnswer(currentQuestion.tone2)}.` }}</small>
-            </article>
+            <article :class="firstToneIsCorrect ? 'correct' : 'wrong'"><strong>1ª sílaba</strong><span>Sua resposta: {{ displayAnswer(answerTone1) }}</span><small>{{ firstToneIsCorrect ? '✓ Você acertou esta sílaba.' : `✕ O correto era ${displayAnswer(currentQuestion.tone1)}.` }}</small></article>
+            <article :class="secondToneIsCorrect ? 'correct' : 'wrong'"><strong>2ª sílaba</strong><span>Sua resposta: {{ displayAnswer(answerTone2) }}</span><small>{{ secondToneIsCorrect ? '✓ Você acertou esta sílaba.' : `✕ O correto era ${displayAnswer(currentQuestion.tone2)}.` }}</small></article>
           </div>
 
           <p v-if="currentQuestion.tone1 === 3 && currentQuestion.tone2 === 3" class="sandhi-note"><b>Regra especial 3–3:</b> na fala contínua, o primeiro 3º tom normalmente sofre sandhi e é realizado com contorno semelhante ao 2º. A resposta mostra os tons lexicais.</p>
@@ -507,43 +464,14 @@ onBeforeUnmount(cancelAutomation)
         <button class="primary-action" type="button" @click="startSession">Treinar novamente</button>
       </div>
 
-      <aside class="tone-pedagogy-note">
-        <strong>Como ler os símbolos?</strong>
-        <p>ˉ representa o 1º tom nivelado; ˊ o 2º ascendente; ˇ o 3º baixo com mudança de direção; ˋ o 4º descendente; · representa o tom neutro contextual.</p>
-      </aside>
+      <aside class="tone-pedagogy-note"><strong>Como ler os símbolos?</strong><p>ˉ representa o 1º tom nivelado; ˊ o 2º ascendente; ˇ o 3º baixo com mudança de direção; ˋ o 4º descendente; · representa o tom neutro contextual.</p></aside>
     </section>
 
     <aside class="mini-dashboard tone-dashboard" aria-label="Desempenho no treino de tons">
       <div class="dashboard-title-row"><p class="eyebrow">Desempenho</p><h2>Pares tonais</h2></div>
-      <section class="dashboard-section">
-        <h3>Sessão atual</h3>
-        <div class="metric-grid">
-          <article><strong>{{ sessionCorrect }}</strong><span>acertos</span></article>
-          <article><strong>{{ sessionPartial }}</strong><span>parciais</span></article>
-          <article><strong>{{ sessionErrors }}</strong><span>erros completos</span></article>
-          <article><strong>{{ sessionStudied }}</strong><span>apenas estudadas</span></article>
-          <article><strong>{{ sessionAccuracy }}%</strong><span>precisão do par</span></article>
-        </div>
-      </section>
-      <section class="dashboard-section">
-        <h3>Histórico neste navegador</h3>
-        <div class="metric-grid compact">
-          <article><strong>{{ attempts.length }}</strong><span>respostas</span></article>
-          <article><strong>{{ historicalAccuracy }}%</strong><span>precisão do par</span></article>
-          <article><strong>{{ historicalPartial }}</strong><span>parciais</span></article>
-          <article><strong>{{ historicalErrors }}</strong><span>erros completos</span></article>
-        </div>
-      </section>
-      <section class="dashboard-section">
-        <h3>Acerto por posição</h3>
-        <p v-if="!detailedAttempts.length" class="dashboard-empty">As estatísticas por sílaba começam a partir das respostas registradas.</p>
-        <div v-else class="syllable-performance-list">
-          <article v-for="item in syllablePerformance" :key="item.label">
-            <div><strong>{{ item.label }}</strong><span>{{ item.errors }} erros em {{ item.attempts }}</span></div>
-            <b>{{ item.accuracy }}%</b>
-          </article>
-        </div>
-      </section>
+      <section class="dashboard-section"><h3>Sessão atual</h3><div class="metric-grid"><article><strong>{{ sessionCorrect }}</strong><span>acertos</span></article><article><strong>{{ sessionPartial }}</strong><span>parciais</span></article><article><strong>{{ sessionErrors }}</strong><span>erros completos</span></article><article><strong>{{ sessionStudied }}</strong><span>apenas estudadas</span></article><article><strong>{{ sessionAccuracy }}%</strong><span>precisão do par</span></article></div></section>
+      <section class="dashboard-section"><h3>Histórico neste navegador</h3><div class="metric-grid compact"><article><strong>{{ attempts.length }}</strong><span>respostas</span></article><article><strong>{{ historicalAccuracy }}%</strong><span>precisão do par</span></article><article><strong>{{ historicalPartial }}</strong><span>parciais</span></article><article><strong>{{ historicalErrors }}</strong><span>erros completos</span></article></div></section>
+      <section class="dashboard-section"><h3>Acerto por posição</h3><p v-if="!detailedAttempts.length" class="dashboard-empty">As estatísticas por sílaba começam a partir das respostas registradas.</p><div v-else class="syllable-performance-list"><article v-for="item in syllablePerformance" :key="item.label"><div><strong>{{ item.label }}</strong><span>{{ item.errors }} erros em {{ item.attempts }}</span></div><b>{{ item.accuracy }}%</b></article></div></section>
       <section class="dashboard-section"><h3>Pares com mais erros</h3><p v-if="!worstPairs.length" class="dashboard-empty">Ainda não há erros registrados.</p><ol v-else class="final-error-list"><li v-for="summary in worstPairs" :key="summary.pairKey"><div><strong>{{ summary.pairKey }}</strong><span>{{ summary.errors }} falhas no par em {{ summary.attempts }}</span></div><b>{{ summary.errorRate }}%</b></li></ol></section>
       <button v-if="attempts.length" class="dashboard-reset" type="button" :disabled="sessionActive" @click="resetHistory">Limpar histórico de tons</button>
     </aside>

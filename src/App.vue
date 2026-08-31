@@ -8,7 +8,7 @@ const FlashcardHub = defineAsyncComponent(() => import('./components/FlashcardHu
 const RadicalsExplorer = defineAsyncComponent(() => import('./components/RadicalsExplorer.vue'))
 
 type AppTab = 'comparison' | 'flashcards' | 'radicals'
-type FlashcardCategory = 'comparison' | 'tones' | 'sentences' | 'pronunciation'
+type FlashcardCategory = 'comparison' | 'tones' | 'sentences' | 'pronunciation' | 'settings'
 
 type RouteState = {
   tab: AppTab
@@ -28,6 +28,9 @@ function routeFromHash(): RouteState {
   }
   if (hash === '#/flashcards/pronunciation' || hash === '#/pronunciation') {
     return { tab: 'flashcards', flashcardCategory: 'pronunciation' }
+  }
+  if (hash === '#/flashcards/settings') {
+    return { tab: 'flashcards', flashcardCategory: 'settings' }
   }
   if (hash === '#/flashcards' || hash === '#/flashcards/comparison') {
     return { tab: 'flashcards', flashcardCategory: 'comparison' }
@@ -60,7 +63,7 @@ const heroTitle = computed(() => {
 
 const heroCopy = computed(() => {
   if (activeTab.value === 'flashcards') {
-    return 'Escolha o tipo de treino e gere uma sessão de flashcards para praticar comparação de iniciais, tons, frases ou pronúncia.'
+    return 'Escolha o tipo de treino, ajuste suas configurações e gere sessões para praticar comparação de iniciais, tons, frases ou pronúncia.'
   }
   if (activeTab.value === 'radicals') {
     return 'Explore os 214 radicais Kangxi por símbolo, Pinyin, significado, número de traços, variantes e evidências históricas verificáveis.'

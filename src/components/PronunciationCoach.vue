@@ -1,9 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, toRef, watch } from 'vue'
 import { humanAudioSamples } from '../data/audioCatalog'
 import { pinyinInitials } from '../data/pinyinMatrix'
 import { toneDisplay } from '../data/toneDisplay'
 import { playHumanAudio } from '../services/audioPlayer'
+import {
+  flashcardQuantityOptions,
+  flashcardSettings,
+} from '../services/flashcardSettings'
 import { comparePronunciation, type PronunciationReport } from '../services/pronunciationAnalysis'
 import type { HumanAudioSample, MandarinTone } from '../types/audio'
 
@@ -17,14 +21,17 @@ const analyzing = ref(false)
 const microphoneError = ref('')
 const report = ref<PronunciationReport | null>(null)
 const recordingUrl = ref('')
-const requestedCards = ref(10)
+const requestedCards = toRef(flashcardSettings, 'quantity')
+const autoRepeat = toRef(flashcardSettings, 'autoRepeat')
+const repeatDelayMs = toRef(flashcardSettings, 'repeatDelayMs')
 const sessionSamples = ref<HumanAudioSample[]>([])
 const currentIndex = ref(0)
 const sessionActive = ref(false)
 const sessionFinished = ref(false)
 const sessionScores = ref<number[]>([])
 
-const quantityOptions = [5, 10, 20, 30]
+const quantityOptions = flashcardQuantityOptions
+const AUTO_REPETITIONS = 3
 
 let mediaRecorder: MediaRecorder | null = null
 let activeStream: MediaStream | null = null
@@ -88,6 +95,10 @@ function shuffle<T>(items: T[]): T[] {
   return result
 }
 
+function waitRepeatDelay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds))
+}
+
 function buildSession(count: number): HumanAudioSample[] {
   const result: HumanAudioSample[] = []
   while (result.length < count && samples.length) {
@@ -120,6 +131,7 @@ function startSession(): void {
   sessionFinished.value = false
   sessionActive.value = true
   applySessionSample(generated[0])
+  if (autoRepeat.value) void playReference(AUTO_REPETITIONS)
 }
 
 function nextSessionCard(): void {
@@ -134,6 +146,7 @@ function nextSessionCard(): void {
 
   currentIndex.value += 1
   applySessionSample(sessionSamples.value[currentIndex.value])
+  if (autoRepeat.value) void playReference(AUTO_REPETITIONS)
 }
 
 function endSession(): void {
@@ -177,8 +190,14 @@ async function fetchReferenceAudio(sample: HumanAudioSample): Promise<ArrayBuffe
   return response.arrayBuffer()
 }
 
-async function playReference(): Promise<void> {
-  if (selectedSample.value) await playHumanAudio(selectedSample.value)
+async function playReference(repetitions = 1): Promise<void> {
+  const sample = selectedSample.value
+  if (!sample) return
+  const safeRepetitions = Math.min(Math.max(Math.trunc(repetitions), 1), AUTO_REPETITIONS)
+  for (let index = 0; index < safeRepetitions; index += 1) {
+    await playHumanAudio(sample)
+    if (index < safeRepetitions - 1 && repeatDelayMs.value > 0) await waitRepeatDelay(repeatDelayMs.value)
+  }
 }
 
 async function playRecording(): Promise<void> {
@@ -296,7 +315,7 @@ onBeforeUnmount(() => {
       <div class="pronunciation-intro">
         <p class="eyebrow">Corretor local</p>
         <h2>Compare sua pronúncia com uma gravação humana</h2>
-        <p>Gere uma sessão de alvos aleatórios ou pratique livremente. A análise compara o contorno tonal e o ritmo sem enviar sua voz para um servidor.</p>
+        <p>Gere uma sessão de alvos aleatórios ou pratique livremente. A quantidade e a repetição da referência seguem as Configurações de FlashCard.</p>
       </div>
 
       <div class="pronunciation-session-setup">
@@ -321,14 +340,8 @@ onBeforeUnmount(() => {
       </div>
 
       <div v-else-if="sessionFinished" class="pronunciation-session-summary" role="status">
-        <div>
-          <span>Sessão concluída</span>
-          <strong>{{ sessionScores.length }} flashcards analisados</strong>
-        </div>
-        <div>
-          <span>Média da sessão</span>
-          <strong>{{ averageSessionScore }}/100</strong>
-        </div>
+        <div><span>Sessão concluída</span><strong>{{ sessionScores.length }} flashcards analisados</strong></div>
+        <div><span>Média da sessão</span><strong>{{ averageSessionScore }}/100</strong></div>
         <button class="primary-action" type="button" @click="startSession">Gerar nova sessão</button>
       </div>
 
@@ -341,19 +354,12 @@ onBeforeUnmount(() => {
       </div>
 
       <article v-if="selectedSample" class="pronunciation-target">
-        <div>
-          <span>{{ sessionActive ? 'Flashcard de pronúncia' : 'Pronúncia alvo' }}</span>
-          <strong>{{ selectedSample.pinyin }}</strong>
-          <small>{{ selectedSample.hanzi || 'Sílaba isolada' }} · {{ selectedSample.speaker }}</small>
-        </div>
-        <button type="button" @click="playReference">▶ Ouvir referência</button>
+        <div><span>{{ sessionActive ? 'Flashcard de pronúncia' : 'Pronúncia alvo' }}</span><strong>{{ selectedSample.pinyin }}</strong><small>{{ selectedSample.hanzi || 'Sílaba isolada' }} · {{ selectedSample.speaker }}</small></div>
+        <button type="button" @click="playReference()">▶ Ouvir referência</button>
       </article>
 
       <div class="microphone-panel">
-        <div class="privacy-note">
-          <strong>Privacidade do microfone</strong>
-          <p>O áudio é processado no seu navegador, não é enviado ao GitHub nem salvo pelo projeto. A faixa do microfone é encerrada ao terminar cada tentativa.</p>
-        </div>
+        <div class="privacy-note"><strong>Privacidade do microfone</strong><p>O áudio é processado no seu navegador, não é enviado ao GitHub nem salvo pelo projeto. A faixa do microfone é encerrada ao terminar cada tentativa.</p></div>
         <div class="record-actions">
           <button v-if="!recording" class="record-button" type="button" :disabled="analyzing || !selectedSample" @click="startRecording">● Gravar pronúncia</button>
           <button v-else class="record-button recording" type="button" @click="stopRecording">■ Parar e analisar</button>
@@ -365,54 +371,18 @@ onBeforeUnmount(() => {
       </div>
 
       <section v-if="report" class="pronunciation-report" :data-status="report.status">
-        <header class="pronunciation-report-header">
-          <div><p class="eyebrow">Resultado</p><h2>{{ reportTitle() }}</h2></div>
-          <strong class="pronunciation-score">{{ report.overallScore }}<small>/100</small></strong>
-        </header>
-
-        <div class="pronunciation-metrics">
-          <article><strong>{{ report.toneScore }}%</strong><span>contorno tonal</span></article>
-          <article><strong>{{ report.durationScore }}%</strong><span>ritmo/duração</span></article>
-          <article><strong>{{ report.signalScore }}%</strong><span>sinal analisável</span></article>
-        </div>
-
-        <article class="pitch-chart">
-          <div class="chart-title"><strong>Curva tonal normalizada</strong><span><i class="reference-dot"></i> referência humana <i class="user-dot"></i> sua voz</span></div>
-          <svg viewBox="0 0 100 60" role="img" aria-label="Comparação entre a curva tonal da referência e a curva tonal da gravação do usuário" preserveAspectRatio="none">
-            <line x1="0" y1="30" x2="100" y2="30" class="chart-midline" />
-            <polyline :points="contourPoints(report.referenceContour)" class="reference-line" />
-            <polyline :points="contourPoints(report.userContour)" class="user-line" />
-          </svg>
-        </article>
-
-        <div class="pronunciation-segments">
-          <article v-for="segment in report.segments" :key="segment.label" :class="segment.status">
-            <div><strong>{{ segment.status === 'ok' ? '✓' : '△' }} {{ segment.label }}</strong><b>{{ segment.score }}%</b></div>
-            <p>{{ segment.message }}</p>
-            <small>Referência: {{ segment.referenceMovement }} · Você: {{ segment.userMovement }}</small>
-          </article>
-        </div>
-
-        <aside class="segmental-limit-note">
-          <strong>O que esta versão consegue corrigir?</strong>
-          <p>Ela avalia contorno do tom e duração. Ainda não classifica automaticamente se uma inicial como <b>zh</b> virou <b>z</b>, nem se uma final foi articulada incorretamente. Essa parte exige um modelo fonético específico; o site não apresenta essa conclusão sem uma medição confiável.</p>
-        </aside>
-
-        <button v-if="sessionActive" class="pronunciation-next-card" type="button" @click="nextSessionCard">
-          {{ currentIndex === sessionSamples.length - 1 ? 'Finalizar sessão' : 'Próximo flashcard' }}
-        </button>
+        <header class="pronunciation-report-header"><div><p class="eyebrow">Resultado</p><h2>{{ reportTitle() }}</h2></div><strong class="pronunciation-score">{{ report.overallScore }}<small>/100</small></strong></header>
+        <div class="pronunciation-metrics"><article><strong>{{ report.toneScore }}%</strong><span>contorno tonal</span></article><article><strong>{{ report.durationScore }}%</strong><span>ritmo/duração</span></article><article><strong>{{ report.signalScore }}%</strong><span>sinal analisável</span></article></div>
+        <article class="pitch-chart"><div class="chart-title"><strong>Curva tonal normalizada</strong><span><i class="reference-dot"></i> referência humana <i class="user-dot"></i> sua voz</span></div><svg viewBox="0 0 100 60" role="img" aria-label="Comparação entre a curva tonal da referência e a curva tonal da gravação do usuário" preserveAspectRatio="none"><line x1="0" y1="30" x2="100" y2="30" class="chart-midline" /><polyline :points="contourPoints(report.referenceContour)" class="reference-line" /><polyline :points="contourPoints(report.userContour)" class="user-line" /></svg></article>
+        <div class="pronunciation-segments"><article v-for="segment in report.segments" :key="segment.label" :class="segment.status"><div><strong>{{ segment.status === 'ok' ? '✓' : '△' }} {{ segment.label }}</strong><b>{{ segment.score }}%</b></div><p>{{ segment.message }}</p><small>Referência: {{ segment.referenceMovement }} · Você: {{ segment.userMovement }}</small></article></div>
+        <aside class="segmental-limit-note"><strong>O que esta versão consegue corrigir?</strong><p>Ela avalia contorno do tom e duração. Ainda não classifica automaticamente se uma inicial como <b>zh</b> virou <b>z</b>, nem se uma final foi articulada incorretamente. Essa parte exige um modelo fonético específico; o site não apresenta essa conclusão sem uma medição confiável.</p></aside>
+        <button v-if="sessionActive" class="pronunciation-next-card" type="button" @click="nextSessionCard">{{ currentIndex === sessionSamples.length - 1 ? 'Finalizar sessão' : 'Próximo flashcard' }}</button>
       </section>
     </section>
 
     <aside class="mini-dashboard pronunciation-help" aria-label="Como usar o corretor de pronúncia">
-      <p class="eyebrow">Como usar</p>
-      <h2>{{ sessionActive ? 'Sessão de pronúncia' : 'Uma tentativa por vez' }}</h2>
-      <ol>
-        <li>Ouça a gravação humana algumas vezes.</li>
-        <li>Grave uma única sílaba, sem falar outras palavras.</li>
-        <li>Observe onde a curva divergiu: início, meio ou final.</li>
-        <li>Repita tentando reproduzir o movimento, não a altura absoluta da voz do falante.</li>
-      </ol>
+      <p class="eyebrow">Como usar</p><h2>{{ sessionActive ? 'Sessão de pronúncia' : 'Uma tentativa por vez' }}</h2>
+      <ol><li>Ouça a gravação humana algumas vezes.</li><li>Grave uma única sílaba, sem falar outras palavras.</li><li>Observe onde a curva divergiu: início, meio ou final.</li><li>Repita tentando reproduzir o movimento, não a altura absoluta da voz do falante.</li></ol>
       <p class="pronunciation-help-note">A comparação normaliza a altura da voz. Uma voz grave não é penalizada por ser mais grave que a referência.</p>
     </aside>
   </section>
