@@ -11,7 +11,7 @@ const MAX_DECOMPRESSED_BYTES = 128 * 1024 * 1024
 const FETCH_ATTEMPTS = 3
 const FETCH_TIMEOUT_MS = 60_000
 const EXPORT_HOST = 'downloads.tatoeba.org'
-const AUDIO_ORIGIN = 'https://audio.tatoeba.org'
+const AUDIO_DOWNLOAD_ORIGIN = 'https://tatoeba.org'
 
 const EXPORT_URLS = {
   cmnSentences: 'https://downloads.tatoeba.org/exports/per_language/cmn/cmn_sentences.tsv.bz2',
@@ -40,6 +40,15 @@ const TONE_VOWELS = {
 function reusableLicense(license = '') {
   const normalized = String(license).trim().toUpperCase()
   return normalized.startsWith('CC0') || normalized.startsWith('CC ')
+}
+
+function licensePreference(license = '') {
+  const normalized = String(license).trim().toUpperCase()
+  if (normalized.startsWith('CC0')) return 5
+  if (/^CC BY(?:\s|$)/.test(normalized) && !normalized.includes('-NC') && !normalized.includes('-SA')) return 4
+  if (normalized.includes('CC BY-SA')) return 3
+  if (normalized.includes('CC BY-NC')) return 2
+  return reusableLicense(normalized) ? 1 : 0
 }
 
 function normalizeNumberedSyllable(value) {
@@ -129,7 +138,7 @@ async function downloadExport(url, label) {
 
   const response = await fetchWithRetry(url, {
     redirect: 'error',
-    headers: { Accept: 'application/octet-stream', 'User-Agent': 'learning-mandarin-static-sync/3.0' },
+    headers: { Accept: 'application/octet-stream', 'User-Agent': 'learning-mandarin-static-sync/3.1' },
   }, label)
   if (!response.ok) throw new Error(`${label}: HTTP ${response.status}`)
 
@@ -184,7 +193,7 @@ function parseCc0Ids(text) {
 }
 
 function parseAudioMap(text) {
-  const allBySentence = new Map()
+  const result = new Map()
 
   for (const columns of rows(text)) {
     const sentenceId = Number(columns[0])
@@ -192,20 +201,15 @@ function parseAudioMap(text) {
     const author = String(columns[2] ?? '').trim()
     const license = String(columns[3] ?? '').trim()
     const attributionUrl = String(columns.slice(4).join('\t') ?? '').trim()
-    if (!Number.isSafeInteger(sentenceId) || !Number.isSafeInteger(audioId)) continue
+    if (!Number.isSafeInteger(sentenceId) || !Number.isSafeInteger(audioId) || !author || !reusableLicense(license)) continue
 
-    const entries = allBySentence.get(sentenceId) ?? []
-    entries.push({ id: audioId, author, license, attributionUrl })
-    allBySentence.set(sentenceId, entries)
+    const candidate = { id: audioId, author, license, attributionUrl }
+    const previous = result.get(sentenceId)
+    if (!previous || licensePreference(candidate.license) > licensePreference(previous.license)) {
+      result.set(sentenceId, candidate)
+    }
   }
 
-  const result = new Map()
-  for (const [sentenceId, entries] of allBySentence) {
-    if (entries.length !== 1) continue
-    const audio = entries[0]
-    if (!audio.author || !reusableLicense(audio.license)) continue
-    result.set(sentenceId, audio)
-  }
   return result
 }
 
@@ -295,7 +299,7 @@ async function collectSentences() {
       syllables,
       audio: {
         id: audio.id,
-        path: `${AUDIO_ORIGIN}/sentences/cmn/${sentenceId}.mp3`,
+        path: `${AUDIO_DOWNLOAD_ORIGIN}/audio/download/${audio.id}`,
         author: audio.author,
         license: audio.license,
         attributionUrl: audio.attributionUrl || `https://tatoeba.org/users/profile/${encodeURIComponent(audio.author)}`,
@@ -307,7 +311,7 @@ async function collectSentences() {
 
   candidates.sort((left, right) => left.syllables.length - right.syllables.length || left.id - right.id)
   const accepted = candidates.slice(0, TARGET_SENTENCES)
-  console.log(`Triagem dos exports Tatoeba: ${JSON.stringify(rejected)}; elegíveis=${candidates.length}; selecionadas=${accepted.length}.`)
+  console.log(`Triagem dos exports Tatoeba: ${JSON.stringify(rejected)}; áudios licenciados=${audioBySentence.size}; elegíveis=${candidates.length}; selecionadas=${accepted.length}.`)
   return accepted
 }
 
@@ -319,4 +323,4 @@ const items = await collectSentences()
 if (items.length < 10) throw new Error(`Catálogo de frases insuficiente: apenas ${items.length} frases elegíveis encontradas.`)
 await writeFile(CATALOG_PATH, catalogSource(items), 'utf8')
 console.log(`Frases humanas: ${items.length}. Sílabas: ${items.reduce((sum, item) => sum + item.syllables.length, 0)}.`)
-console.log(`Falantes: ${new Set(items.map((item) => item.audio.author)).size}. Fonte: exports semanais do Tatoeba; áudio servido pelo host estático oficial.`)
+console.log(`Falantes: ${new Set(items.map((item) => item.audio.author)).size}. Fonte: exports semanais do Tatoeba; áudio identificado por gravação licenciada.`)
