@@ -19,13 +19,13 @@ jobs:
   build:
     name: Preparar site estático
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 35
     steps:
       - name: Baixar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configurar Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 22
 
@@ -39,7 +39,22 @@ jobs:
         run: npm run tone-pairs:sync
 
       - name: Baixar frases humanas para treino auditivo
-        run: npm run phrases:sync
+        shell: bash
+        run: |
+          set -euo pipefail
+          for tentativa in 1 2; do
+            if npm run phrases:sync; then
+              exit 0
+            fi
+
+            if [ "$tentativa" -eq 2 ]; then
+              echo "Falha ao sincronizar as frases humanas após duas execuções completas."
+              exit 1
+            fi
+
+            echo "Tatoeba indisponível ou instável. Nova tentativa em 20 segundos."
+            sleep 20
+          done
 
       - name: Gerar catálogo de radicais
         run: npm run radicals:sync
