@@ -35,7 +35,8 @@ let automationGeneration = 0
 const AUTO_REPETITIONS = 3
 const STUDY_PAUSE_MS = 2000
 const STORAGE_KEY = 'learning-mandarin:sentence-attempts:v1'
-const TRUSTED_REMOTE_AUDIO_ORIGIN = 'https://audio.tatoeba.org'
+const TRUSTED_REMOTE_AUDIO_ORIGIN = 'https://tatoeba.org'
+const TRUSTED_REMOTE_AUDIO_PATH = /^\/audio\/download\/\d+$/
 
 const allFinals = [...new Set(pinyinInitials.flatMap((item) => item.finals))].sort((a, b) => a.localeCompare(b))
 const initialOptions = pinyinInitials.map((item) => ({ value: item.value || '∅', label: item.value || '∅ — sem inicial' }))
@@ -128,9 +129,14 @@ function optionsForMode(): { value: string; label: string }[] {
 function resolveAudioUrl(source: string): string {
   if (/^https?:\/\//i.test(source)) {
     const parsed = new URL(source)
-    if (parsed.protocol !== 'https:' || parsed.origin !== TRUSTED_REMOTE_AUDIO_ORIGIN) {
-      throw new Error('Origem de áudio remoto não permitida.')
-    }
+    const trusted = parsed.protocol === 'https:'
+      && parsed.origin === TRUSTED_REMOTE_AUDIO_ORIGIN
+      && TRUSTED_REMOTE_AUDIO_PATH.test(parsed.pathname)
+      && !parsed.search
+      && !parsed.hash
+      && !parsed.username
+      && !parsed.password
+    if (!trusted) throw new Error('Origem de áudio remoto não permitida.')
     return parsed.href
   }
 
