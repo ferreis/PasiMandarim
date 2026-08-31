@@ -31,27 +31,34 @@ export async function playHumanAudio(sample: HumanAudioSample): Promise<void> {
   audio.preload = 'auto'
   activeAudio = audio
 
-  await audio.play()
-
   await new Promise<void>((resolve, reject) => {
     let settled = false
+
+    const cleanup = () => {
+      audio.removeEventListener('ended', finish)
+      audio.removeEventListener('error', fail)
+      if (activeAudio === audio) activeAudio = null
+      if (resolveActivePlayback === finish) resolveActivePlayback = null
+    }
 
     const finish = () => {
       if (settled) return
       settled = true
-      if (activeAudio === audio) activeAudio = null
-      if (resolveActivePlayback === finish) resolveActivePlayback = null
+      cleanup()
       resolve()
+    }
+
+    const fail = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(new Error('Falha ao reproduzir a gravação humana.'))
     }
 
     resolveActivePlayback = finish
     audio.addEventListener('ended', finish, { once: true })
-    audio.addEventListener('error', () => {
-      if (settled) return
-      settled = true
-      if (activeAudio === audio) activeAudio = null
-      if (resolveActivePlayback === finish) resolveActivePlayback = null
-      reject(new Error('Falha ao reproduzir a gravação humana.'))
-    }, { once: true })
+    audio.addEventListener('error', fail, { once: true })
+
+    audio.play().catch(() => fail())
   })
 }
