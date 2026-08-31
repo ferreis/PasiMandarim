@@ -117,7 +117,7 @@ test('treina um par tonal selecionado e salva o resultado no navegador', async (
   await mockAudio(page)
   await page.goto('/#/tones')
 
-  await expect(page.getByRole('heading', { name: 'Flashcards' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Flashcards', exact: true })).toBeVisible()
   await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: 'Tons' })).toHaveAttribute('aria-current', 'page')
 
   await keepOnlyFirstTone(page, 1)
