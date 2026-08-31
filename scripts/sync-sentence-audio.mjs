@@ -1,17 +1,29 @@
-import { mkdir, writeFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 
 const ROOT = process.cwd()
-const OUTPUT_DIR = path.join(ROOT, 'public', 'audio', 'tatoeba')
 const CATALOG_PATH = path.join(ROOT, 'src', 'data', 'generatedSentenceCatalog.ts')
 const TARGET_SENTENCES = 30
-const MAX_PAGES = 8
-const MAX_AUDIO_BYTES = 5 * 1024 * 1024
+const MAX_EXPORT_BYTES = 25 * 1024 * 1024
+const MAX_DECOMPRESSED_BYTES = 128 * 1024 * 1024
 const FETCH_ATTEMPTS = 3
-const FETCH_TIMEOUT_MS = 30_000
-const ALLOWED_AUDIO_HOSTS = new Set(['api.tatoeba.org', 'tatoeba.org', 'www.tatoeba.org', 'audio.tatoeba.org'])
+const FETCH_TIMEOUT_MS = 60_000
+const EXPORT_HOST = 'downloads.tatoeba.org'
+const AUDIO_DOWNLOAD_ORIGIN = 'https://tatoeba.org'
+
+const EXPORT_URLS = {
+  cmnSentences: 'https://downloads.tatoeba.org/exports/per_language/cmn/cmn_sentences.tsv.bz2',
+  cmnSentencesCc0: 'https://downloads.tatoeba.org/exports/per_language/cmn/cmn_sentences_CC0.tsv.bz2',
+  cmnAudio: 'https://downloads.tatoeba.org/exports/per_language/cmn/cmn_sentences_with_audio.tsv.bz2',
+  cmnTranscriptions: 'https://downloads.tatoeba.org/exports/per_language/cmn/cmn_transcriptions.tsv.bz2',
+  cmnPortugueseLinks: 'https://downloads.tatoeba.org/exports/per_language/cmn/cmn-por_links.tsv.bz2',
+  cmnEnglishLinks: 'https://downloads.tatoeba.org/exports/per_language/cmn/cmn-eng_links.tsv.bz2',
+  englishPortugueseLinks: 'https://downloads.tatoeba.org/exports/per_language/eng/eng-por_links.tsv.bz2',
+  portugueseSentences: 'https://downloads.tatoeba.org/exports/per_language/por/por_sentences.tsv.bz2',
+}
+
 const VALID_FINALS = new Set([
   'a','o','e','ai','ei','ao','ou','an','en','ang','eng','er','i','ia','iao','ie','iu','ian','in','iang','ing','iong',
   'u','ua','uo','uai','ui','uan','un','uang','ueng','ong','ü','üe','üan','ün',
@@ -22,13 +34,23 @@ const ZERO_INITIAL_MAP = [
   ['weng','ueng'],['wang','uang'],['wen','un'],['wei','ui'],['wai','uai'],['wan','uan'],['wu','u'],['wo','uo'],['wa','ua'],
 ]
 
-function audioLicense(audio) {
-  return String(audio?.license ?? audio?.licence ?? '').trim()
+const TONE_VOWELS = {
+  a: ['a','ā','á','ǎ','à'], e: ['e','ē','é','ě','è'], i: ['i','ī','í','ǐ','ì'],
+  o: ['o','ō','ó','ǒ','ò'], u: ['u','ū','ú','ǔ','ù'], ü: ['ü','ǖ','ǘ','ǚ','ǜ'],
 }
 
 function reusableLicense(license = '') {
   const normalized = String(license).trim().toUpperCase()
   return normalized.startsWith('CC0') || normalized.startsWith('CC ')
+}
+
+function licensePreference(license = '') {
+  const normalized = String(license).trim().toUpperCase()
+  if (normalized.startsWith('CC0')) return 5
+  if (/^CC BY(?:\s|$)/.test(normalized) && !normalized.includes('-NC') && !normalized.includes('-SA')) return 4
+  if (normalized.includes('CC BY-SA')) return 3
+  if (normalized.includes('CC BY-NC')) return 2
+  return reusableLicense(normalized) ? 1 : 0
 }
 
 function normalizeNumberedSyllable(value) {
@@ -50,11 +72,6 @@ function splitPinyin(baseInput) {
   return null
 }
 
-const TONE_VOWELS = {
-  a: ['a','ā','á','ǎ','à'], e: ['e','ē','é','ě','è'], i: ['i','ī','í','ǐ','ì'],
-  o: ['o','ō','ó','ǒ','ò'], u: ['u','ū','ú','ǔ','ù'], ü: ['ü','ǖ','ǘ','ǚ','ǜ'],
-}
-
 function toneMarked(baseInput, tone) {
   const base = normalizeNumberedSyllable(baseInput)
   if (tone === 5) return base
@@ -72,11 +89,8 @@ function toneMarked(baseInput, tone) {
   return `${base.slice(0, index)}${marked}${base.slice(index + 1)}`
 }
 
-function parsePinyin(transcriptions = []) {
-  const candidate = transcriptions.find((item) => item?.type === 'transcription' && item?.script === 'Latn' && /[1-5]/.test(item.text ?? ''))
-    ?? transcriptions.find((item) => /[1-5]/.test(item?.text ?? ''))
-  if (!candidate) return []
-  const matches = String(candidate.text).match(/[A-Za-zÜüVv:]+[1-5]/g) ?? []
+function parsePinyinText(text = '') {
+  const matches = String(text).match(/[A-Za-zÜüVv:]+[1-5]/g) ?? []
   return matches.map((token) => {
     const tone = Number(token.at(-1))
     const base = normalizeNumberedSyllable(token.slice(0, -1))
@@ -88,15 +102,6 @@ function parsePinyin(transcriptions = []) {
 
 function chineseCharacters(text) {
   return [...text].filter((char) => /\p{Script=Han}/u.test(char))
-}
-
-function pickPortugueseTranslation(translations = []) {
-  const matches = translations.filter((item) => item?.lang === 'por' && typeof item.text === 'string' && item.text.trim())
-  return (matches.find((item) => item.is_direct) ?? matches[0])?.text?.trim() ?? ''
-}
-
-function pickAudio(audios = []) {
-  return audios.find((audio) => audio?.id && reusableLicense(audioLicense(audio))) ?? null
 }
 
 function wait(milliseconds) {
@@ -114,148 +119,249 @@ async function fetchWithRetry(url, options = {}, label = 'Recurso remoto') {
       })
       const retryableStatus = response.status === 429 || response.status >= 500
       if (response.ok || !retryableStatus) return response
-
       await response.body?.cancel()
       lastError = new Error(`HTTP ${response.status}`)
     } catch (error) {
       lastError = error
     }
 
-    if (attempt < FETCH_ATTEMPTS) await wait(attempt * 1_000)
+    if (attempt < FETCH_ATTEMPTS) await wait(attempt * 1_500)
   }
 
   const reason = lastError instanceof Error ? lastError.message : 'erro de rede desconhecido'
   throw new Error(`${label}: falha após ${FETCH_ATTEMPTS} tentativas (${reason}).`)
 }
 
-async function fetchJson(url) {
-  const response = await fetchWithRetry(url, {
-    headers: { Accept: 'application/json', 'User-Agent': 'learning-mandarin-static-sync/1.0' },
-  }, 'Tatoeba API')
-  if (!response.ok) throw new Error(`Tatoeba API ${response.status}: ${url}`)
-  return response.json()
-}
+async function downloadExport(url, label) {
+  const parsed = new URL(url)
+  if (parsed.protocol !== 'https:' || parsed.hostname !== EXPORT_HOST) {
+    throw new Error(`${label}: origem de export não permitida.`)
+  }
 
-async function downloadAudio(audioId, destination) {
-  if (existsSync(destination)) return
-  const url = `https://api.tatoeba.org/v1/audios/${audioId}/file`
   const response = await fetchWithRetry(url, {
-    redirect: 'follow',
-    headers: { 'User-Agent': 'learning-mandarin-static-sync/1.0' },
-  }, `Áudio ${audioId}`)
-  if (!response.ok) throw new Error(`Áudio ${audioId}: HTTP ${response.status}`)
-  const finalUrl = new URL(response.url)
-  if (finalUrl.protocol !== 'https:' || !ALLOWED_AUDIO_HOSTS.has(finalUrl.hostname)) {
-    throw new Error(`Áudio ${audioId}: redirecionamento não permitido para ${finalUrl.hostname}`)
-  }
-  const contentType = response.headers.get('content-type') ?? ''
-  if (!contentType.startsWith('audio/') && !contentType.includes('octet-stream')) {
-    throw new Error(`Áudio ${audioId}: tipo inesperado ${contentType}`)
-  }
+    redirect: 'error',
+    headers: { Accept: 'application/octet-stream', 'User-Agent': 'learning-mandarin-static-sync/3.2' },
+  }, label)
+  if (!response.ok) throw new Error(`${label}: HTTP ${response.status}`)
+
+  const declaredSize = Number(response.headers.get('content-length') ?? 0)
+  if (declaredSize > MAX_EXPORT_BYTES) throw new Error(`${label}: arquivo remoto excede o limite permitido.`)
+
   const buffer = Buffer.from(await response.arrayBuffer())
-  if (!buffer.length || buffer.length > MAX_AUDIO_BYTES) throw new Error(`Áudio ${audioId}: tamanho inválido (${buffer.length})`)
-  await writeFile(destination, buffer, { mode: 0o644 })
+  if (!buffer.length || buffer.length > MAX_EXPORT_BYTES) {
+    throw new Error(`${label}: tamanho inválido (${buffer.length}).`)
+  }
+  return buffer
 }
 
-function makeSearchUrl(after = '') {
-  const url = new URL('https://api.tatoeba.org/v1/sentences')
-  url.searchParams.set('lang', 'cmn')
-  url.searchParams.set('has_audio', 'yes')
-  url.searchParams.set('is_unapproved', 'no')
-  url.searchParams.set('is_orphan', 'no')
-  url.searchParams.set('word_count', '3-10')
-  url.searchParams.set('trans:lang', 'por')
-  url.searchParams.set('showtrans:lang', 'por')
-  url.searchParams.set('showtrans:is_unapproved', 'no')
-  url.searchParams.set('include', 'audios,transcriptions')
-  url.searchParams.set('sort', 'words')
-  url.searchParams.set('limit', '100')
-  if (after) url.searchParams.set('after', after)
-  return url
+function decompressBzip2(buffer, label) {
+  const result = spawnSync('bzip2', ['-dc'], {
+    input: buffer,
+    encoding: 'utf8',
+    maxBuffer: MAX_DECOMPRESSED_BYTES,
+  })
+  if (result.error?.code === 'ENOENT') throw new Error(`${label}: o comando bzip2 não está instalado.`)
+  if (result.error) throw new Error(`${label}: falha ao descompactar (${result.error.message}).`)
+  if (result.status !== 0) throw new Error(`${label}: bzip2 terminou com código ${result.status}.`)
+  return result.stdout
 }
 
-function extractAfter(nextUrl) {
-  if (!nextUrl) return ''
-  try { return new URL(nextUrl).searchParams.get('after') ?? '' } catch { return '' }
+async function loadExport(url, label) {
+  return decompressBzip2(await downloadExport(url, label), label)
+}
+
+function rows(text) {
+  return text.split(/\r?\n/).filter(Boolean).map((line) => line.split('\t'))
+}
+
+function parseSentenceMap(text, wantedIds = null) {
+  const result = new Map()
+  for (const columns of rows(text)) {
+    const id = Number(columns[0])
+    if (!Number.isSafeInteger(id) || (wantedIds && !wantedIds.has(id))) continue
+    const sentence = columns.slice(2).join('\t').trim()
+    if (sentence) result.set(id, sentence)
+  }
+  return result
+}
+
+function parseCc0Ids(text) {
+  const ids = new Set()
+  for (const columns of rows(text)) {
+    const id = Number(columns[0])
+    if (Number.isSafeInteger(id)) ids.add(id)
+  }
+  return ids
+}
+
+function parseAudioMap(text) {
+  const result = new Map()
+
+  for (const columns of rows(text)) {
+    const sentenceId = Number(columns[0])
+    const audioId = Number(columns[1])
+    const author = String(columns[2] ?? '').trim()
+    const license = String(columns[3] ?? '').trim()
+    const attributionUrl = String(columns.slice(4).join('\t') ?? '').trim()
+    if (!Number.isSafeInteger(sentenceId) || !Number.isSafeInteger(audioId) || !author || !reusableLicense(license)) continue
+
+    const candidate = { id: audioId, author, license, attributionUrl }
+    const previous = result.get(sentenceId)
+    if (!previous || licensePreference(candidate.license) > licensePreference(previous.license)) {
+      result.set(sentenceId, candidate)
+    }
+  }
+
+  return result
+}
+
+function parseTranscriptionMap(text) {
+  const result = new Map()
+  for (const columns of rows(text)) {
+    const sentenceId = Number(columns[0])
+    const lang = String(columns[1] ?? '').trim()
+    const script = String(columns[2] ?? '').trim()
+    const transcription = String(columns.slice(4).join('\t') ?? '').trim()
+    if (!Number.isSafeInteger(sentenceId) || lang !== 'cmn' || !/[1-5]/.test(transcription)) continue
+    const score = /Latn|Pinyin/i.test(script) ? 2 : 1
+    const previous = result.get(sentenceId)
+    if (!previous || score > previous.score) result.set(sentenceId, { text: transcription, score })
+  }
+  return new Map([...result].map(([id, value]) => [id, value.text]))
+}
+
+function parseLinks(text) {
+  const result = new Map()
+  for (const columns of rows(text)) {
+    const sourceId = Number(columns[0])
+    const targetId = Number(columns[1])
+    if (!Number.isSafeInteger(sourceId) || !Number.isSafeInteger(targetId)) continue
+    const targets = result.get(sourceId) ?? []
+    if (!targets.includes(targetId)) targets.push(targetId)
+    result.set(sourceId, targets)
+  }
+  return result
+}
+
+function buildPortugueseTargets(directLinks, cmnEnglishLinks, englishPortugueseLinks, sentenceIds) {
+  const result = new Map()
+  const wantedPortugueseIds = new Set()
+  let directCount = 0
+  let bridgedCount = 0
+
+  for (const sentenceId of sentenceIds) {
+    const direct = directLinks.get(sentenceId) ?? []
+    if (direct.length) {
+      result.set(sentenceId, direct)
+      direct.forEach((id) => wantedPortugueseIds.add(id))
+      directCount += 1
+      continue
+    }
+
+    const viaEnglish = []
+    for (const englishId of cmnEnglishLinks.get(sentenceId) ?? []) {
+      for (const portugueseId of englishPortugueseLinks.get(englishId) ?? []) {
+        if (!viaEnglish.includes(portugueseId)) viaEnglish.push(portugueseId)
+        if (viaEnglish.length >= 5) break
+      }
+      if (viaEnglish.length >= 5) break
+    }
+    if (!viaEnglish.length) continue
+    result.set(sentenceId, viaEnglish)
+    viaEnglish.forEach((id) => wantedPortugueseIds.add(id))
+    bridgedCount += 1
+  }
+
+  return { result, wantedPortugueseIds, directCount, bridgedCount }
 }
 
 async function collectSentences() {
-  const accepted = []
-  const seenSentenceIds = new Set()
+  const [cmnText, cc0Text, audioText, transcriptionText, directLinksText, cmnEnglishText, englishPortugueseText] = await Promise.all([
+    loadExport(EXPORT_URLS.cmnSentences, 'Frases em mandarim'),
+    loadExport(EXPORT_URLS.cmnSentencesCc0, 'Licenças CC0 em mandarim'),
+    loadExport(EXPORT_URLS.cmnAudio, 'Metadados de áudio em mandarim'),
+    loadExport(EXPORT_URLS.cmnTranscriptions, 'Transcrições em Pinyin'),
+    loadExport(EXPORT_URLS.cmnPortugueseLinks, 'Links mandarim-português'),
+    loadExport(EXPORT_URLS.cmnEnglishLinks, 'Links mandarim-inglês'),
+    loadExport(EXPORT_URLS.englishPortugueseLinks, 'Links inglês-português'),
+  ])
+
+  const audioBySentence = parseAudioMap(audioText)
+  const transcriptionBySentence = parseTranscriptionMap(transcriptionText)
+  const cc0Ids = parseCc0Ids(cc0Text)
+  const directLinks = parseLinks(directLinksText)
+  const cmnEnglishLinks = parseLinks(cmnEnglishText)
+  const englishPortugueseLinks = parseLinks(englishPortugueseText)
+  const translations = buildPortugueseTargets(directLinks, cmnEnglishLinks, englishPortugueseLinks, audioBySentence.keys())
+  const portugueseText = await loadExport(EXPORT_URLS.portugueseSentences, 'Frases em português')
+  const portugueseById = parseSentenceMap(portugueseText, translations.wantedPortugueseIds)
+
+  const candidates = []
   const rejected = { fetched: 0, translation: 0, transcription: 0, length: 0, final: 0, audio: 0 }
-  let after = ''
 
-  for (let page = 0; page < MAX_PAGES && accepted.length < TARGET_SENTENCES; page += 1) {
-    const payload = await fetchJson(makeSearchUrl(after))
+  for (const columns of rows(cmnText)) {
+    const sentenceId = Number(columns[0])
+    if (!Number.isSafeInteger(sentenceId)) continue
+    const text = columns.slice(2).join('\t').trim()
+    if (!text) continue
+    rejected.fetched += 1
 
-    for (const sentence of payload.data ?? []) {
-      if (accepted.length >= TARGET_SENTENCES) break
-      if (!sentence?.id || seenSentenceIds.has(sentence.id)) continue
-      seenSentenceIds.add(sentence.id)
-      rejected.fetched += 1
+    const audio = audioBySentence.get(sentenceId)
+    if (!audio) { rejected.audio += 1; continue }
 
-      const translationPt = pickPortugueseTranslation(sentence.translations)
-      if (!translationPt) { rejected.translation += 1; continue }
+    const translationPt = (translations.result.get(sentenceId) ?? [])
+      .map((portugueseId) => portugueseById.get(portugueseId) ?? '')
+      .find(Boolean) ?? ''
+    if (!translationPt) { rejected.translation += 1; continue }
 
-      const parsed = parsePinyin(sentence.transcriptions)
-      if (!parsed.length) { rejected.transcription += 1; continue }
+    const transcription = transcriptionBySentence.get(sentenceId) ?? ''
+    const parsed = parsePinyinText(transcription)
+    if (!parsed.length) { rejected.transcription += 1; continue }
 
-      const hanzi = chineseCharacters(sentence.text ?? '')
-      if (parsed.length < 3 || parsed.length > 8 || parsed.length !== hanzi.length) { rejected.length += 1; continue }
+    const hanzi = chineseCharacters(text)
+    if (parsed.length < 3 || parsed.length > 8 || parsed.length !== hanzi.length) { rejected.length += 1; continue }
 
-      const syllables = parsed.map((item, index) => ({
-        hanzi: hanzi[index],
-        pinyin: item.marked,
-        numbered: `${item.base}${item.tone}`,
-        initial: item.initial,
-        final: item.final,
-        tone: item.tone,
-      }))
-      if (syllables.some((item) => !VALID_FINALS.has(item.final))) { rejected.final += 1; continue }
+    const syllables = parsed.map((item, index) => ({
+      hanzi: hanzi[index],
+      pinyin: item.marked,
+      numbered: `${item.base}${item.tone}`,
+      initial: item.initial,
+      final: item.final,
+      tone: item.tone,
+    }))
+    if (syllables.some((item) => !VALID_FINALS.has(item.final))) { rejected.final += 1; continue }
 
-      const audio = pickAudio(sentence.audios)
-      if (!audio) { rejected.audio += 1; continue }
-      const license = audioLicense(audio)
-
-      accepted.push({
-        id: sentence.id,
-        text: sentence.text,
-        translationPt,
-        pinyin: syllables.map((item) => item.pinyin).join(' '),
-        syllables,
-        audio: {
-          id: audio.id,
-          path: `/audio/tatoeba/${audio.id}.mp3`,
-          author: audio.author,
-          license,
-          attributionUrl: audio.attribution_url || audio.author_url || `https://tatoeba.org/users/profile/${encodeURIComponent(audio.author)}`,
-        },
-        sourceUrl: `https://tatoeba.org/pt-br/sentences/show/${sentence.id}`,
-        textLicense: sentence.license,
-      })
-    }
-
-    if (!payload.paging?.has_next) break
-    after = extractAfter(payload.paging.next)
-    if (!after) break
+    candidates.push({
+      id: sentenceId,
+      text,
+      translationPt,
+      pinyin: syllables.map((item) => item.pinyin).join(' '),
+      syllables,
+      audio: {
+        id: audio.id,
+        path: `${AUDIO_DOWNLOAD_ORIGIN}/audio/download/${audio.id}`,
+        author: audio.author,
+        license: audio.license,
+        attributionUrl: audio.attributionUrl || `https://tatoeba.org/users/profile/${encodeURIComponent(audio.author)}`,
+      },
+      sourceUrl: `https://tatoeba.org/pt-br/sentences/show/${sentenceId}`,
+      textLicense: cc0Ids.has(sentenceId) ? 'CC0 1.0' : 'CC BY 2.0 FR',
+    })
   }
-  console.log(`Triagem Tatoeba: ${JSON.stringify(rejected)}; aceitas=${accepted.length}.`)
+
+  candidates.sort((left, right) => left.syllables.length - right.syllables.length || left.id - right.id)
+  const accepted = candidates.slice(0, TARGET_SENTENCES)
+  console.log(`Traduções disponíveis entre áudios licenciados: diretas=${translations.directCount}; via inglês=${translations.bridgedCount}.`)
+  console.log(`Triagem dos exports Tatoeba: ${JSON.stringify(rejected)}; áudios licenciados=${audioBySentence.size}; elegíveis=${candidates.length}; selecionadas=${accepted.length}.`)
   return accepted
 }
 
 function catalogSource(items) {
-  return `// Arquivo gerado por scripts/sync-sentence-audio.mjs. Não edite manualmente.\n\nexport type SentenceSyllable = {\n  hanzi: string\n  pinyin: string\n  numbered: string\n  initial: string\n  final: string\n  tone: number\n}\n\nexport type SentencePracticeItem = {\n  id: number\n  text: string\n  translationPt: string\n  pinyin: string\n  syllables: SentenceSyllable[]\n  audio: { id: number; path: string; author: string; license: string; attributionUrl: string }\n  sourceUrl: string\n  textLicense: string\n}\n\nexport const sentencePracticeCatalog: SentencePracticeItem[] = ${JSON.stringify(items, null, 2)}\n`
+  return `// Arquivo gerado por scripts/sync-sentence-audio.mjs a partir dos exports semanais do Tatoeba. Não edite manualmente.\n\nexport type SentenceSyllable = {\n  hanzi: string\n  pinyin: string\n  numbered: string\n  initial: string\n  final: string\n  tone: number\n}\n\nexport type SentencePracticeItem = {\n  id: number\n  text: string\n  translationPt: string\n  pinyin: string\n  syllables: SentenceSyllable[]\n  audio: { id: number; path: string; author: string; license: string; attributionUrl: string }\n  sourceUrl: string\n  textLicense: string\n}\n\nexport const sentencePracticeCatalog: SentencePracticeItem[] = ${JSON.stringify(items, null, 2)}\n`
 }
 
-await mkdir(OUTPUT_DIR, { recursive: true })
 const items = await collectSentences()
 if (items.length < 10) throw new Error(`Catálogo de frases insuficiente: apenas ${items.length} frases elegíveis encontradas.`)
-
-for (const item of items) {
-  const destination = path.join(OUTPUT_DIR, `${item.audio.id}.mp3`)
-  await downloadAudio(item.audio.id, destination)
-}
-
 await writeFile(CATALOG_PATH, catalogSource(items), 'utf8')
 console.log(`Frases humanas: ${items.length}. Sílabas: ${items.reduce((sum, item) => sum + item.syllables.length, 0)}.`)
-console.log(`Falantes: ${new Set(items.map((item) => item.audio.author)).size}. Fonte: Tatoeba.`)
+console.log(`Falantes: ${new Set(items.map((item) => item.audio.author)).size}. Fonte: exports semanais do Tatoeba; áudio identificado por gravação licenciada.`)
