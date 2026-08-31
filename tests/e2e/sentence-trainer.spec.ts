@@ -13,11 +13,20 @@ async function mockAudio(page: import('@playwright/test').Page) {
   })
 }
 
+async function useSettings(
+  page: import('@playwright/test').Page,
+  settings: { quantity: number; autoRepeat: boolean; studyMode: boolean; repeatDelayMs: number },
+) {
+  await page.addInitScript((value) => {
+    localStorage.setItem('learning-mandarin:flashcard-settings:v1', JSON.stringify(value))
+  }, settings)
+}
+
 test('abre o treino de frases com os três modos', async ({ page }) => {
   await page.goto('/#/sentences')
 
-  await expect(page.getByRole('heading', { name: 'Flashcards auditivos' })).toBeVisible()
-  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: /Frases/ })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('heading', { name: 'Flashcards' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Categorias de flashcards' }).getByRole('link', { name: 'Frases' })).toHaveAttribute('aria-current', 'page')
   await expect(page.getByRole('button', { name: 'Iniciais' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Finais' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Tons' })).toBeVisible()
@@ -26,6 +35,7 @@ test('abre o treino de frases com os três modos', async ({ page }) => {
 
 test('reproduz automaticamente três vezes e permite revelar sem pontuar', async ({ page }) => {
   await mockAudio(page)
+  await useSettings(page, { quantity: 10, autoRepeat: true, studyMode: false, repeatDelayMs: 0 })
   await page.goto('/#/sentences')
 
   await page.getByRole('button', { name: 'Iniciar sessão' }).click()
@@ -41,6 +51,7 @@ test('reproduz automaticamente três vezes e permite revelar sem pontuar', async
 
 test('muda para iniciais e cria uma resposta para cada sílaba', async ({ page }) => {
   await mockAudio(page)
+  await useSettings(page, { quantity: 5, autoRepeat: true, studyMode: false, repeatDelayMs: 0 })
   await page.goto('/#/sentences')
 
   await page.getByRole('button', { name: 'Iniciais' }).click()
@@ -52,12 +63,22 @@ test('muda para iniciais e cria uma resposta para cada sílaba', async ({ page }
   await expect(selectors.first()).toContainText('∅ — sem inicial')
 })
 
-test('modo estudo automático revela e avança sem registrar desempenho', async ({ page }) => {
+test('não exibe quantidade nem opções gerais duplicadas na tela de frases', async ({ page }) => {
+  await page.goto('/#/flashcards/sentences')
+
+  const generalControls = page.locator('.sentence-controls > label')
+  await expect(generalControls).toHaveCount(3)
+  await expect(generalControls.nth(0)).toBeHidden()
+  await expect(generalControls.nth(1)).toBeHidden()
+  await expect(generalControls.nth(2)).toBeHidden()
+})
+
+test('modo estudo automático usa a configuração global e avança sem registrar desempenho', async ({ page }) => {
   test.setTimeout(12_000)
   await mockAudio(page)
+  await useSettings(page, { quantity: 5, autoRepeat: true, studyMode: true, repeatDelayMs: 0 })
   await page.goto('/#/sentences')
 
-  await page.locator('.sentence-check').nth(1).locator('input').check()
   await page.getByRole('button', { name: 'Iniciar sessão' }).click()
   await expect(page.getByRole('button', { name: 'Parar modo automático' })).toBeVisible()
   await expect(page.getByText('Resposta revelada.', { exact: true })).toBeVisible({ timeout: 4_000 })
