@@ -19,7 +19,7 @@ jobs:
   build:
     name: Preparar site estático
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Baixar código
         uses: actions/checkout@v7
@@ -34,6 +34,16 @@ jobs:
 
       - name: Gerar catálogo web de áudio humano
         run: npm run audio:web-catalog
+
+      - name: Preparar Python para os áudios TTS estáticos
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Gerar áudios TTS estáticos
+        run: |
+          pip install edge-tts
+          npm run audio:tts:sync
 
       - name: Baixar áudios humanos dos pares tonais
         run: npm run tone-pairs:sync

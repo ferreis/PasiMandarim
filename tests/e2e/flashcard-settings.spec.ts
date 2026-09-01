@@ -2,16 +2,22 @@ import { expect, test } from '@playwright/test'
 
 async function mockAudio(page: import('@playwright/test').Page) {
   await page.addInitScript(() => {
+    const audioCalls: string[] = []
     class MockAudio extends EventTarget {
       currentTime = 0
       preload = ''
       src = ''
-      constructor(src = '') { super(); this.src = src }
+      constructor(src = '') {
+        super()
+        this.src = src
+        audioCalls.push(src)
+      }
       async play() {
         queueMicrotask(() => this.dispatchEvent(new Event('ended')))
       }
       pause() {}
     }
+    Object.defineProperty(window, '__audioCalls', { value: audioCalls, configurable: true })
     Object.defineProperty(window, 'Audio', { value: MockAudio, configurable: true })
   })
 }
@@ -34,6 +40,21 @@ test('usa a quantidade global na comparação sem mostrar um controle local', as
   await expect(page.locator('.flashcard-setup-grid').getByText('Quantidade', { exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Iniciar sessão' }).click()
   await expect(page.getByText('Questão 1 de 5')).toBeVisible()
+})
+
+test('configura a fonte TTS e revela a escolha de voz somente quando aplicável', async ({ page }) => {
+  await page.goto('/#/flashcards/settings')
+
+  await expect(page.getByRole('radio', { name: 'Áudio humano', exact: true })).toBeChecked()
+  await expect(page.getByLabel('Voz TTS')).toHaveCount(0)
+  await page.getByRole('radio', { name: 'TTS', exact: true }).check()
+  await expect(page.getByLabel('Voz TTS')).toBeVisible()
+  await expect(page.getByLabel('Voz TTS')).toHaveValue('recommended')
+  await page.getByLabel('Voz TTS').selectOption('zh-CN-YunxiNeural')
+
+  const stored = await page.evaluate(() => localStorage.getItem('learning-mandarin:flashcard-settings:v1'))
+  expect(stored).toContain('"audioSource":"tts"')
+  expect(stored).toContain('"ttsVoice":"zh-CN-YunxiNeural"')
 })
 
 test('usa a quantidade global em tons sem mostrar controles gerais duplicados', async ({ page }) => {
@@ -82,6 +103,32 @@ test('ativa o modo estudo da comparação pela aba de configurações sem perder
   await expect(page.getByText('Resposta revelada.', { exact: true })).toBeVisible({ timeout: 4_000 })
   const stored = await page.evaluate(() => localStorage.getItem('learning-mandarin:flashcard-attempts:v1'))
   expect(stored).toBeNull()
+})
+
+test('reproduz a comparação dos dois lados quando a resposta da comparação está errada', async ({ page }) => {
+  await mockAudio(page)
+  await setSettings(page, { quantity: 5, autoRepeat: false, studyMode: false, repeatDelayMs: 0 })
+  await page.goto('/#/flashcards/comparison')
+
+  await page.getByRole('button', { name: 'Iniciar sessão' }).click()
+  await expect(page.getByText('Questão 1 de 5')).toBeVisible()
+  await page.evaluate(() => { window.__audioCalls.length = 0 })
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const buttons = page.locator('.flashcard-choices button')
+    const count = await buttons.count()
+    if (count === 0) break
+    await buttons.nth(0).click()
+    const resultText = await page.locator('.flashcard-result strong').textContent().catch(() => '')
+    if (resultText?.includes('Incorreto')) {
+      const audioCalls = await page.evaluate(() => window.__audioCalls.length)
+      expect(audioCalls).toBeGreaterThanOrEqual(2)
+      return
+    }
+    await page.getByRole('button', { name: 'Próximo flashcard' }).click()
+  }
+
+  throw new Error('Não foi possível gerar uma resposta errada para validar o playback de contraste.')
 })
 
 test('remove os textos substituídos da área de flashcards', async ({ page }) => {

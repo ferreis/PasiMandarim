@@ -37,8 +37,8 @@ const audioSources = [
       <span class="footer-kicker">Áudios de referência</span>
       <h2 id="audio-license-title">Licenças e créditos</h2>
       <p>
-        O Learning Mandarin utiliza somente gravações humanas verificadas. Os áudios permanecem
-        sujeitos às licenças e aos créditos dos respectivos acervos de origem.
+        O Pasi Mandarim distingue gravações humanas de áudio TTS. Os recursos permanecem sujeitos
+        às licenças, aos termos e aos créditos dos respectivos acervos de origem.
       </p>
     </div>
 

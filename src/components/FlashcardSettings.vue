@@ -2,6 +2,7 @@
 import {
   flashcardQuantityOptions,
   flashcardRepeatDelayOptions,
+  flashcardTtsVoiceOptions,
   flashcardSettings,
   formatRepeatDelay,
   resetFlashcardSettings,
@@ -36,6 +37,28 @@ import {
         <input v-model="flashcardSettings.autoRepeat" type="checkbox" aria-label="Reproduzir 3 vezes automaticamente" />
       </label>
 
+      <fieldset class="flashcard-setting-row flashcard-audio-source">
+        <legend>
+          <strong>Fonte de áudio das comparações</strong>
+          <small>Define a origem dos sons usados no treino de iniciais.</small>
+        </legend>
+        <div class="flashcard-audio-options" role="radiogroup" aria-label="Fonte de áudio das comparações">
+          <label><input v-model="flashcardSettings.audioSource" type="radio" value="human" /> Áudio humano</label>
+          <label><input v-model="flashcardSettings.audioSource" type="radio" value="tts" /> TTS</label>
+          <label><input v-model="flashcardSettings.audioSource" type="radio" value="human-tts" /> Áudio humano + TTS</label>
+        </div>
+      </fieldset>
+
+      <label v-if="flashcardSettings.audioSource !== 'human'" class="flashcard-setting-row">
+        <span>
+          <strong>Voz TTS</strong>
+          <small>“Recomendada” usa Xiaoxiao, voz zh-CN selecionada pela clareza e consistência para iniciantes.</small>
+        </span>
+        <select v-model="flashcardSettings.ttsVoice" aria-label="Voz TTS">
+          <option v-for="voice in flashcardTtsVoiceOptions" :key="voice.value" :value="voice.value">{{ voice.label }}</option>
+        </select>
+      </label>
+
       <label v-if="flashcardSettings.autoRepeat" class="flashcard-setting-row">
         <span>
           <strong>Tempo entre as repetições</strong>
@@ -65,5 +88,5 @@ import {
 </template>
 
 <style scoped>
-.flashcard-settings{display:grid;gap:24px;max-width:960px;margin:0 auto}.flashcard-settings-heading{display:grid;gap:6px}.flashcard-settings-heading h2{margin:0;font-size:clamp(1.35rem,2vw,1.75rem)}.flashcard-settings-heading p{margin:0;color:#62707d;line-height:1.6}.flashcard-settings-list{display:grid;border:1px solid #d9e0e7;border-radius:18px;overflow:hidden}.flashcard-setting-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,220px);align-items:center;gap:24px;padding:20px;background:#fff}.flashcard-setting-row+.flashcard-setting-row{border-top:1px solid #e5eaef}.flashcard-setting-row>span{display:grid;gap:5px}.flashcard-setting-row strong{font-size:1rem}.flashcard-setting-row small{color:#62707d;line-height:1.5}.flashcard-setting-row select{width:100%;min-height:44px}.flashcard-setting-toggle{grid-template-columns:minmax(0,1fr) auto}.flashcard-setting-toggle input{width:24px;height:24px;accent-color:#17202a}.flashcard-settings-footer{display:flex;align-items:center;justify-content:space-between;gap:20px}.flashcard-settings-footer p{margin:0;color:#62707d;font-size:.9rem}.flashcard-settings-footer button{min-height:42px;padding:0 16px;border:1px solid #cbd4dc;border-radius:12px;background:#fff;color:#17202a;font-weight:700;cursor:pointer}.flashcard-settings-footer button:hover{background:#f5f7f9}@media(max-width:680px){.flashcard-setting-row,.flashcard-setting-toggle{grid-template-columns:1fr;gap:12px}.flashcard-setting-toggle input{justify-self:start}.flashcard-settings-footer{align-items:flex-start;flex-direction:column}}
+.flashcard-settings{display:grid;gap:24px;max-width:960px;margin:0 auto}.flashcard-settings-heading{display:grid;gap:6px}.flashcard-settings-heading h2{margin:0;font-size:clamp(1.35rem,2vw,1.75rem)}.flashcard-settings-heading p{margin:0;color:#62707d;line-height:1.6}.flashcard-settings-list{display:grid;border:1px solid #d9e0e7;border-radius:18px;overflow:hidden}.flashcard-setting-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,220px);align-items:center;gap:24px;padding:20px;background:#fff;border:0;margin:0;min-width:0}.flashcard-setting-row+.flashcard-setting-row{border-top:1px solid #e5eaef}.flashcard-setting-row>span,.flashcard-setting-row legend{display:grid;gap:5px;padding:0}.flashcard-setting-row strong{font-size:1rem}.flashcard-setting-row small{color:#62707d;line-height:1.5}.flashcard-setting-row select{width:100%;min-height:44px}.flashcard-setting-toggle{grid-template-columns:minmax(0,1fr) auto}.flashcard-setting-toggle input{width:24px;height:24px;accent-color:#17202a}.flashcard-audio-source{grid-template-columns:minmax(0,1fr) minmax(250px,1.25fr)}.flashcard-audio-options{display:grid;gap:8px}.flashcard-audio-options label{display:flex;align-items:center;gap:8px;font-weight:650;cursor:pointer}.flashcard-audio-options input{width:18px;height:18px;accent-color:#17202a}.flashcard-settings-footer{display:flex;align-items:center;justify-content:space-between;gap:20px}.flashcard-settings-footer p{margin:0;color:#62707d;font-size:.9rem}.flashcard-settings-footer button{min-height:42px;padding:0 16px;border:1px solid #cbd4dc;border-radius:12px;background:#fff;color:#17202a;font-weight:700;cursor:pointer}.flashcard-settings-footer button:hover{background:#f5f7f9}@media(max-width:680px){.flashcard-setting-row,.flashcard-setting-toggle,.flashcard-audio-source{grid-template-columns:1fr;gap:12px}.flashcard-setting-toggle input{justify-self:start}.flashcard-settings-footer{align-items:flex-start;flex-direction:column}}
 </style>

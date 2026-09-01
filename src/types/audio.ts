@@ -24,3 +24,24 @@ export type HumanAudioSample = {
   localFile: boolean
   verifiedHuman: true
 }
+
+export type TtsVoiceId =
+  | 'zh-CN-XiaoxiaoNeural'
+  | 'zh-CN-YunxiNeural'
+  | 'zh-CN-XiaoyiNeural'
+
+export type TtsAudioSample = {
+  key: string
+  pinyin: string
+  hanzi: string
+  initial: string
+  final: string
+  tone: MandarinTone
+  audioUrl: string
+  voice: TtsVoiceId
+  provider: 'edge-tts'
+  localFile: true
+  generatedTts: true
+}
+
+export type PlayableAudioSample = HumanAudioSample | TtsAudioSample

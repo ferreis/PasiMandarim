@@ -188,7 +188,7 @@ watch(filteredRadicals, (radicals) => {
             <p>
               Dados estruturados do Hanzi Project, revisão fixada. O projeto agrega fontes como
               Unicode/Unihan e CNS de Taiwan e mantém a proveniência de cada campo. Variantes usuais
-              adicionais são mantidas pelo Learning Mandarin como ajuda didática.
+              adicionais são mantidas pelo Pasi Mandarim como ajuda didática.
             </p>
           </div>
           <a :href="selectedRadical.sourceUrl" target="_blank" rel="noreferrer">Ver registro original</a>

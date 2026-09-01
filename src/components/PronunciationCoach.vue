@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, toRef, watch } from 'vue'
 import { humanAudioSamples } from '../data/audioCatalog'
-import { pinyinInitials } from '../data/pinyinMatrix'
+import { getPinyinInitials } from '../services/publicDataRepository'
 import { toneDisplay } from '../data/toneDisplay'
 import { playHumanAudio } from '../services/audioPlayer'
 import {
-  flashcardQuantityOptions,
   flashcardSettings,
 } from '../services/flashcardSettings'
 import { comparePronunciation, type PronunciationReport } from '../services/pronunciationAnalysis'
 import type { HumanAudioSample, MandarinTone } from '../types/audio'
+
+const pinyinInitials = getPinyinInitials()
 
 const samples = humanAudioSamples.filter((sample) => sample.verifiedHuman && sample.tone !== 5)
 const initialOptions = pinyinInitials.filter((initial) => samples.some((sample) => sample.initial === initial.value))
@@ -30,13 +31,16 @@ const sessionActive = ref(false)
 const sessionFinished = ref(false)
 const sessionScores = ref<number[]>([])
 
-const quantityOptions = flashcardQuantityOptions
 const AUTO_REPETITIONS = 3
 
 let mediaRecorder: MediaRecorder | null = null
 let activeStream: MediaStream | null = null
 let chunks: BlobPart[] = []
 let stopTimer: number | undefined
+let waveformFrame: number | undefined
+let recordingAudioContext: AudioContext | null = null
+let recordingAnalyser: AnalyserNode | null = null
+const waveformLevels = ref<number[]>(Array.from({ length: 48 }, () => 0.06))
 
 const availableFinals = computed(() => [...new Set(
   samples.filter((sample) => sample.initial === selectedInitial.value).map((sample) => sample.final),
@@ -216,6 +220,50 @@ function stopStream(): void {
   activeStream = null
 }
 
+function resetWaveform(): void {
+  waveformLevels.value = Array.from({ length: 48 }, () => 0.06)
+}
+
+function stopWaveform(): void {
+  if (waveformFrame !== undefined) window.cancelAnimationFrame(waveformFrame)
+  waveformFrame = undefined
+  recordingAnalyser?.disconnect()
+  recordingAnalyser = null
+  if (recordingAudioContext && recordingAudioContext.state !== 'closed') void recordingAudioContext.close()
+  recordingAudioContext = null
+  resetWaveform()
+}
+
+function startWaveform(stream: MediaStream): void {
+  stopWaveform()
+  const AudioContextConstructor = window.AudioContext
+  if (!AudioContextConstructor) return
+  try {
+    recordingAudioContext = new AudioContextConstructor()
+    const source = recordingAudioContext.createMediaStreamSource(stream)
+    recordingAnalyser = recordingAudioContext.createAnalyser()
+    recordingAnalyser.fftSize = 256
+    recordingAnalyser.smoothingTimeConstant = 0.78
+    source.connect(recordingAnalyser)
+    const samples = new Uint8Array(recordingAnalyser.fftSize)
+    const draw = () => {
+      if (!recording.value || !recordingAnalyser) return
+      recordingAnalyser.getByteTimeDomainData(samples)
+      const blockSize = Math.floor(samples.length / 48)
+      waveformLevels.value = Array.from({ length: 48 }, (_, index) => {
+        let peak = 0
+        const start = index * blockSize
+        for (let cursor = start; cursor < start + blockSize; cursor += 1) peak = Math.max(peak, Math.abs(samples[cursor] - 128) / 128)
+        return Math.max(0.06, peak)
+      })
+      waveformFrame = window.requestAnimationFrame(draw)
+    }
+    waveformFrame = window.requestAnimationFrame(draw)
+  } catch {
+    // A gravação segue disponível caso o analisador não seja suportado.
+  }
+}
+
 function revokeRecordingUrl(): void {
   if (recordingUrl.value) URL.revokeObjectURL(recordingUrl.value)
   recordingUrl.value = ''
@@ -269,6 +317,7 @@ async function startRecording(): Promise<void> {
     mediaRecorder.addEventListener('stop', async () => {
       window.clearTimeout(stopTimer)
       recording.value = false
+      stopWaveform()
       const blob = new Blob(chunks, { type: mediaRecorder?.mimeType || 'audio/webm' })
       stopStream()
       mediaRecorder = null
@@ -280,8 +329,10 @@ async function startRecording(): Promise<void> {
     }, { once: true })
     mediaRecorder.start()
     recording.value = true
+    startWaveform(activeStream)
     stopTimer = window.setTimeout(stopRecording, 4500)
   } catch (error) {
+    stopWaveform()
     stopStream()
     const name = error instanceof DOMException ? error.name : ''
     microphoneError.value = name === 'NotAllowedError'
@@ -305,6 +356,7 @@ onBeforeUnmount(() => {
   window.clearTimeout(stopTimer)
   if (mediaRecorder?.state === 'recording') mediaRecorder.stop()
   stopStream()
+  stopWaveform()
   revokeRecordingUrl()
 })
 </script>
@@ -319,12 +371,6 @@ onBeforeUnmount(() => {
       </div>
 
       <div class="pronunciation-session-setup">
-        <label>
-          <span class="field-label">Quantidade</span>
-          <select v-model.number="requestedCards" :disabled="sessionActive || recording || analyzing">
-            <option v-for="quantity in quantityOptions" :key="quantity" :value="quantity">{{ quantity }} flashcards</option>
-          </select>
-        </label>
         <button v-if="!sessionActive" class="primary-action" type="button" :disabled="recording || analyzing || !samples.length" @click="startSession">
           Gerar flashcards de pronúncia
         </button>
@@ -364,6 +410,9 @@ onBeforeUnmount(() => {
           <button v-if="!recording" class="record-button" type="button" :disabled="analyzing || !selectedSample" @click="startRecording">● Gravar pronúncia</button>
           <button v-else class="record-button recording" type="button" @click="stopRecording">■ Parar e analisar</button>
           <button v-if="recordingUrl && !recording" type="button" class="secondary-record-button" @click="playRecording">▶ Ouvir minha gravação</button>
+        </div>
+        <div v-if="recording" class="recording-waveform" role="img" aria-label="Onda do áudio do microfone durante a gravação">
+          <span v-for="(level, index) in waveformLevels" :key="index" :style="{ transform: `scaleY(${level})` }"></span>
         </div>
         <p v-if="recording" class="recording-status" role="status">Gravando… fale a sílaba uma vez. A gravação para automaticamente em até 4,5 segundos.</p>
         <p v-if="analyzing" class="recording-status" role="status">Analisando o contorno tonal localmente…</p>

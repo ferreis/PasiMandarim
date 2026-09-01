@@ -10,9 +10,9 @@ import AudioLicenses from './AudioLicenses.vue'
       <section class="project-footer" aria-labelledby="project-footer-title">
         <div>
           <span class="footer-kicker">Sobre o projeto</span>
-          <h2 id="project-footer-title">Learning Mandarin</h2>
+          <h2 id="project-footer-title">Pasi Mandarim</h2>
           <p>
-            Projeto de código aberto, gratuito e mantido sem fins lucrativos para apoiar o estudo
+            Projeto de código aberto e gratuito para estudantes, criado para apoiar o estudo
             de pronúncia, percepção auditiva e componentes da escrita chinesa.
           </p>
         </div>

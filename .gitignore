@@ -21,6 +21,8 @@ public/audio/
 # Logs, cobertura e arquivos do sistema
 *.log
 coverage/
+test-results/
+playwright-report/
 .DS_Store
 Thumbs.db
 

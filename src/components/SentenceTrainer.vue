@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, toRef, watch } from 'vue'
 import { sentencePracticeCatalog, type SentencePracticeItem, type SentenceSyllable } from '../data/generatedSentenceCatalog'
-import { pinyinInitials } from '../data/pinyinMatrix'
+import { getPinyinInitials } from '../services/publicDataRepository'
 import { toneDisplay } from '../data/toneDisplay'
 import {
   flashcardQuantityOptions,
@@ -10,6 +10,8 @@ import {
 
 type TrainingMode = 'initial' | 'final' | 'tone'
 type PhraseAttempt = { mode: TrainingMode; correct: number; total: number; perfect: boolean }
+
+const pinyinInitials = getPinyinInitials()
 
 const mode = ref<TrainingMode>('tone')
 const requestedCards = toRef(flashcardSettings, 'quantity')

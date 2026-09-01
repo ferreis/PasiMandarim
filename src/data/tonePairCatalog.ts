@@ -1,16 +1,17 @@
-import rawTonePairWords from '../../data/tone-pairs.json'
+import {
+  getTonePairWords as getAllTonePairWords,
+  getTonePairWordsForTones,
+  tonePairAudioPath,
+  tonePairKey,
+} from '../services/publicDataRepository'
 import type { TonePairWord } from '../types/tonePair'
 
-export const tonePairWords = rawTonePairWords as TonePairWord[]
+export { tonePairAudioPath, tonePairKey }
 
-export function tonePairKey(tone1: number, tone2: number): string {
-  return `${tone1}-${tone2}`
-}
+/** @deprecated Import getTonePairWords() from services/publicDataRepository. */
+export const tonePairWords = getAllTonePairWords()
 
-export function tonePairAudioPath(word: TonePairWord): string {
-  return `/audio/tone-pairs/sinosplice/${word.slug}.mp3`
-}
-
+/** @deprecated Import getTonePairWordsForTones() from services/publicDataRepository. */
 export function getTonePairWords(tone1: number, tone2: number): TonePairWord[] {
-  return tonePairWords.filter((word) => word.tone1 === tone1 && word.tone2 === tone2)
+  return getTonePairWordsForTones(tone1, tone2)
 }

@@ -1,4 +1,5 @@
 import { reactive, watch } from 'vue'
+import type { TtsVoiceId } from '../types/audio'
 
 export const FLASHCARD_SETTINGS_STORAGE_KEY = 'learning-mandarin:flashcard-settings:v1'
 export const flashcardQuantityOptions = [5, 10, 20, 30, 50] as const
@@ -6,12 +7,24 @@ export const flashcardRepeatDelayOptions = [0, 250, 500, 750, 1000, 1500, 2000] 
 
 export type FlashcardQuantity = typeof flashcardQuantityOptions[number]
 export type FlashcardRepeatDelay = typeof flashcardRepeatDelayOptions[number]
+export const flashcardAudioSourceOptions = ['human', 'tts', 'human-tts'] as const
+export type FlashcardAudioSource = typeof flashcardAudioSourceOptions[number]
+export const recommendedTtsVoice: TtsVoiceId = 'zh-CN-XiaoxiaoNeural'
+export const flashcardTtsVoiceOptions = [
+  { value: 'recommended', label: 'Recomendada' },
+  { value: 'zh-CN-XiaoxiaoNeural', label: 'Xiaoxiao (feminina)' },
+  { value: 'zh-CN-YunxiNeural', label: 'Yunxi (masculina)' },
+  { value: 'zh-CN-XiaoyiNeural', label: 'Xiaoyi (feminina)' },
+] as const
+export type FlashcardTtsVoiceSelection = typeof flashcardTtsVoiceOptions[number]['value']
 
 export type FlashcardSettings = {
   quantity: FlashcardQuantity
   autoRepeat: boolean
   studyMode: boolean
   repeatDelayMs: FlashcardRepeatDelay
+  audioSource: FlashcardAudioSource
+  ttsVoice: FlashcardTtsVoiceSelection
 }
 
 const defaults: FlashcardSettings = {
@@ -19,10 +32,16 @@ const defaults: FlashcardSettings = {
   autoRepeat: true,
   studyMode: false,
   repeatDelayMs: 500,
+  audioSource: 'human',
+  ttsVoice: 'recommended',
 }
 
 function includesNumber<T extends readonly number[]>(options: T, value: unknown): value is T[number] {
   return typeof value === 'number' && options.includes(value)
+}
+
+function includesString<T extends readonly string[]>(options: T, value: unknown): value is T[number] {
+  return typeof value === 'string' && options.includes(value)
 }
 
 function loadSettings(): FlashcardSettings {
@@ -35,10 +54,16 @@ function loadSettings(): FlashcardSettings {
       autoRepeat: typeof parsed.autoRepeat === 'boolean' ? parsed.autoRepeat : defaults.autoRepeat,
       studyMode: typeof parsed.studyMode === 'boolean' ? parsed.studyMode : defaults.studyMode,
       repeatDelayMs: includesNumber(flashcardRepeatDelayOptions, parsed.repeatDelayMs) ? parsed.repeatDelayMs : defaults.repeatDelayMs,
+      audioSource: includesString(flashcardAudioSourceOptions, parsed.audioSource) ? parsed.audioSource : defaults.audioSource,
+      ttsVoice: includesString(flashcardTtsVoiceOptions.map((option) => option.value), parsed.ttsVoice) ? parsed.ttsVoice : defaults.ttsVoice,
     }
   } catch {
     return { ...defaults }
   }
+}
+
+export function resolveFlashcardTtsVoice(selection: FlashcardTtsVoiceSelection): TtsVoiceId {
+  return selection === 'recommended' ? recommendedTtsVoice : selection
 }
 
 export const flashcardSettings = reactive<FlashcardSettings>(loadSettings())

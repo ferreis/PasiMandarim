@@ -1,4 +1,4 @@
-import { tonePairAudioPath } from '../data/tonePairCatalog'
+import { tonePairAudioPath } from './publicDataRepository'
 import type { TonePairWord } from '../types/tonePair'
 
 let activeAudio: HTMLAudioElement | null = null

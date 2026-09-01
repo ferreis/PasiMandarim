@@ -7,12 +7,14 @@ import {
   humanAudioSamples,
   samplesUseSameSpeaker,
 } from '../data/audioCatalog'
-import { getCommonFinals, pinyinInitials } from '../data/pinyinMatrix'
+import { getCommonFinals, getPinyinInitials } from '../services/publicDataRepository'
 import { mandarinTones, toneDisplay, toneText } from '../data/toneDisplay'
 import { playHumanAudio } from '../services/audioPlayer'
 import { buildToneMarkedPinyin } from '../utils/pinyin'
 import type { HumanAudioSample, MandarinTone } from '../types/audio'
 import InitialPronunciationPair from './InitialPronunciationPair.vue'
+
+const pinyinInitials = getPinyinInitials()
 
 const initialA = ref('b')
 const initialB = ref('p')

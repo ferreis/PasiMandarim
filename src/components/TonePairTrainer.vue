@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, toRef, watch } from 'vue'
-import { tonePairKey, tonePairWords } from '../data/tonePairCatalog'
+import { getTonePairWords, tonePairKey } from '../services/publicDataRepository'
 import { toneDisplay } from '../data/toneDisplay'
 import {
   flashcardQuantityOptions,
@@ -13,6 +13,8 @@ import type { ToneNumber, TonePairAttempt, TonePairWord } from '../types/tonePai
 type FirstTone = Exclude<ToneNumber, 5>
 type PairErrorSummary = { pairKey: string; attempts: number; errors: number; errorRate: number }
 type DetailedAttempt = TonePairAttempt & { tone1Correct: boolean; tone2Correct: boolean }
+
+const tonePairWords = getTonePairWords()
 
 const firstToneOptions: FirstTone[] = [1, 2, 3, 4]
 const secondToneOptions: ToneNumber[] = [1, 2, 3, 4, 5]

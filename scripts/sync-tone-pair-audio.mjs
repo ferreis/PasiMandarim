@@ -7,7 +7,7 @@ const catalogPath = path.join(root, 'data', 'tone-pairs.json')
 const outputDir = path.join(root, 'public', 'audio', 'tone-pairs', 'sinosplice')
 const sourceBase = 'https://www.sinosplice.com/wp-content/uploads/tone-pair-drills/'
 const sourceOrigin = new URL(sourceBase).origin
-const userAgent = 'LearningMandarin/0.5 (+https://github.com/ferreis/learning_Mandarin)'
+const userAgent = 'PasiMandarim/0.5 (+https://github.com/ferreis/learning_Mandarin)'
 const maxFileBytes = 5 * 1024 * 1024
 const force = process.argv.includes('--force')
 

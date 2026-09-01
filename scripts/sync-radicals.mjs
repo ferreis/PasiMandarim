@@ -102,7 +102,7 @@ function genericExplanation(number, meaningPt, forms) {
 
 async function fetchRadical(number) {
   const url = `${RAW_BASE}/radicals/${number}.json`
-  const response = await fetch(url, { headers: { 'user-agent': 'learning-mandarin-radicals-sync' } })
+  const response = await fetch(url, { headers: { 'user-agent': 'pasi-mandarim-radicals-sync' } })
   if (!response.ok) throw new Error(`Falha ao baixar radical ${number}: HTTP ${response.status}`)
   return response.json()
 }

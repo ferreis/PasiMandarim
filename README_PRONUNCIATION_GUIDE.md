@@ -15,7 +15,7 @@ Cada guia mostra:
 - referência aproximada para falantes de português;
 - contraste recomendado quando existe um par de aspiração.
 
-Os diagramas de posição da língua são SVGs esquemáticos criados especificamente para o Learning Mandarin. As imagens encontradas no arquivo Anki usado como referência de estrutura não foram copiadas porque sua licença não estava identificada.
+Os diagramas de posição da língua são SVGs esquemáticos criados especificamente para o Pasi Mandarim. As imagens encontradas no arquivo Anki usado como referência de estrutura não foram copiadas porque sua licença não estava identificada.
 
 O HTML do arquivo Anki também não é carregado pela aplicação. As explicações são dados tipados e renderizados como texto pelo Vue, evitando injetar conteúdo HTML não confiável no navegador.
 

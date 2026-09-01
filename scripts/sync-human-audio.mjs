@@ -21,7 +21,7 @@ const maximumDownloadAttempts = 8
 
 let lastAudioDownloadStartedAt = 0
 
-const userAgent = 'LearningMandarin/0.2 (+https://github.com/ferreis/learning_Mandarin)'
+const userAgent = 'PasiMandarim/0.2 (+https://github.com/ferreis/learning_Mandarin)'
 const commonsApi = 'https://commons.wikimedia.org/w/api.php'
 const yojikBase = 'https://fsi-languages.yojik.eu/audiocollections'
 

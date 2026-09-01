@@ -10,14 +10,14 @@ defineProps<{
   <header class="site-navbar">
     <div class="site-navbar-inner">
       <a class="site-brand" href="#/comparison" aria-label="Voltar para a tela inicial">
-        <svg class="site-brand-mark" viewBox="0 0 64 64" role="img" aria-label="Logo Learning Mandarin">
+        <svg class="site-brand-mark" viewBox="0 0 64 64" role="img" aria-label="Marca Pasi Mandarim">
           <rect x="3" y="3" width="58" height="58" rx="18" fill="currentColor" />
           <path d="M17 24h12" stroke="white" stroke-width="4" stroke-linecap="round" />
           <path d="M36 27l10-7" stroke="white" stroke-width="4" stroke-linecap="round" />
           <path d="M17 39c4-7 8-7 12 0" fill="none" stroke="white" stroke-width="4" stroke-linecap="round" />
           <path d="M36 36l10 8" stroke="white" stroke-width="4" stroke-linecap="round" />
         </svg>
-        <span>Learning Mandarin</span>
+        <span>Pasi Mandarim</span>
       </a>
 
       <nav class="site-nav-links" aria-label="Menu principal">

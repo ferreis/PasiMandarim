@@ -1,4 +1,4 @@
-import type { HumanAudioSample } from '../types/audio'
+import type { HumanAudioSample, PlayableAudioSample } from '../types/audio'
 
 let activeAudio: HTMLAudioElement | null = null
 let resolveActivePlayback: (() => void) | null = null
@@ -10,7 +10,7 @@ function resolveAudioUrl(audioUrl: string): string {
   return `${import.meta.env.BASE_URL}${relativePath}`
 }
 
-export function stopHumanAudio(): void {
+export function stopAudio(): void {
   if (activeAudio) {
     activeAudio.pause()
     activeAudio.currentTime = 0
@@ -20,12 +20,12 @@ export function stopHumanAudio(): void {
   resolveActivePlayback = null
 }
 
-export async function playHumanAudio(sample: HumanAudioSample): Promise<void> {
-  if (!sample.verifiedHuman) {
-    throw new Error('O áudio de referência precisa ser uma gravação humana verificada.')
-  }
+export const stopHumanAudio = stopAudio
 
-  stopHumanAudio()
+export async function playAudioSample(sample: PlayableAudioSample): Promise<void> {
+  if ('verifiedHuman' in sample && !sample.verifiedHuman) throw new Error('A gravação humana não foi verificada.')
+
+  stopAudio()
 
   const audio = new Audio(resolveAudioUrl(sample.audioUrl))
   audio.preload = 'auto'
@@ -52,7 +52,7 @@ export async function playHumanAudio(sample: HumanAudioSample): Promise<void> {
       if (settled) return
       settled = true
       cleanup()
-      reject(new Error('Falha ao reproduzir a gravação humana.'))
+      reject(new Error('Falha ao reproduzir o áudio.'))
     }
 
     resolveActivePlayback = finish
@@ -61,4 +61,8 @@ export async function playHumanAudio(sample: HumanAudioSample): Promise<void> {
 
     audio.play().catch(() => fail())
   })
+}
+
+export function playHumanAudio(sample: HumanAudioSample): Promise<void> {
+  return playAudioSample(sample)
 }

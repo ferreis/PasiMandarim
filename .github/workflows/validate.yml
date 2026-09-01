@@ -30,6 +30,7 @@ jobs:
         run: |
           node --check scripts/sync-human-audio.mjs
           node --check scripts/sync-web-audio-catalog.mjs
+          node --check scripts/sync-tts-audio.mjs
           node --check scripts/sync-tone-pair-audio.mjs
           node --check scripts/sync-sentence-audio.mjs
           node --check scripts/generate-sentence-fixture.mjs

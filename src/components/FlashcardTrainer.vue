@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, toRef, watch } from 'vue'
+import { getCommonFinals, getPinyinInitials } from '../services/publicDataRepository'
+import { useComparisonAudioFeedback, type ComparisonSide } from '../services/comparisonAudioFeedback'
 import {
-  findHumanAudioSample,
-  getAvailableTonesForPair,
-  samplesUseSameSpeaker,
-} from '../data/audioCatalog'
-import { getCommonFinals, pinyinInitials } from '../data/pinyinMatrix'
-import { playHumanAudio, stopHumanAudio } from '../services/audioPlayer'
-import { flashcardSettings } from '../services/flashcardSettings'
+  buildComparisonQuestions,
+  type ComparisonCandidate,
+  type ComparisonQuestion,
+} from '../services/comparisonQuestionGenerator'
+import { flashcardSettings, resolveFlashcardTtsVoice } from '../services/flashcardSettings'
+import { resolveComparisonAudio } from '../services/flashcardAudioProviders'
 import {
   buildInitialPairKey,
   clearFlashcardAttemptsForPair,
@@ -16,22 +17,14 @@ import {
   type FlashcardAttempt,
 } from '../services/flashcardStats'
 import { buildToneMarkedPinyin } from '../utils/pinyin'
-import type { HumanAudioSample, MandarinTone } from '../types/audio'
+import type { MandarinTone, PlayableAudioSample } from '../types/audio'
 
-type FlashcardSide = 'a' | 'b'
+type FlashcardSide = ComparisonSide
 
-type FlashcardCandidate = {
-  final: string
-  tone: MandarinTone
-  sampleA: HumanAudioSample
-  sampleB: HumanAudioSample
-  sameSpeaker: boolean
-}
+const pinyinInitials = getPinyinInitials()
 
-type FlashcardQuestion = FlashcardCandidate & {
-  targetSide: FlashcardSide
-  answerOrder: FlashcardSide[]
-}
+type FlashcardCandidate = ComparisonCandidate
+type FlashcardQuestion = ComparisonQuestion
 
 type FinalErrorSummary = {
   final: string
@@ -46,15 +39,17 @@ const requestedCards = toRef(flashcardSettings, 'quantity')
 const autoRepeat = toRef(flashcardSettings, 'autoRepeat')
 const studyMode = toRef(flashcardSettings, 'studyMode')
 const repeatDelayMs = toRef(flashcardSettings, 'repeatDelayMs')
+const audioSource = toRef(flashcardSettings, 'audioSource')
+const ttsVoice = toRef(flashcardSettings, 'ttsVoice')
 const attempts = ref<FlashcardAttempt[]>(loadFlashcardAttempts())
+const comparisonAudio = useComparisonAudioFeedback()
 
 const questions = ref<FlashcardQuestion[]>([])
 const currentIndex = ref(0)
 const answer = ref<FlashcardSide | null>(null)
 const revealedOnly = ref(false)
 const hasPlayed = ref(false)
-const audioLoading = ref(false)
-const audioError = ref('')
+const { activeSide, error: audioError, isPlaying: audioLoading } = comparisonAudio
 const sessionCorrect = ref(0)
 const sessionErrors = ref(0)
 const sessionStudied = ref(0)
@@ -69,27 +64,6 @@ const STUDY_PAUSE_MS = 2000
 
 function displayInitial(initial: string): string {
   return initial || '∅'
-}
-
-function randomIndex(max: number): number {
-  if (max <= 1) return 0
-  const limit = Math.floor(0x100000000 / max) * max
-  const buffer = new Uint32Array(1)
-
-  do {
-    globalThis.crypto.getRandomValues(buffer)
-  } while (buffer[0] >= limit)
-
-  return buffer[0] % max
-}
-
-function shuffle<T>(items: T[]): T[] {
-  const result = [...items]
-  for (let index = result.length - 1; index > 0; index -= 1) {
-    const swapIndex = randomIndex(index + 1)
-    ;[result[index], result[swapIndex]] = [result[swapIndex], result[index]]
-  }
-  return result
 }
 
 function wait(milliseconds: number): Promise<void> {
@@ -108,17 +82,15 @@ const allCandidates = computed<FlashcardCandidate[]>(() => {
   const candidates: FlashcardCandidate[] = []
 
   for (const final of getCommonFinals(initialA.value, initialB.value)) {
-    for (const tone of getAvailableTonesForPair(initialA.value, initialB.value, final)) {
-      const sampleA = findHumanAudioSample(initialA.value, final, tone)
-      const sampleB = findHumanAudioSample(initialB.value, final, tone)
-      if (!sampleA || !sampleB) continue
-
+    for (const tone of [1, 2, 3, 4, 5] as MandarinTone[]) {
+      const resolved = resolveComparisonAudio(
+        initialA.value, initialB.value, final, tone, audioSource.value, resolveFlashcardTtsVoice(ttsVoice.value),
+      )
+      if (!resolved) continue
       candidates.push({
         final,
         tone,
-        sampleA,
-        sampleB,
-        sameSpeaker: samplesUseSameSpeaker(sampleA, sampleB),
+        ...resolved,
       })
     }
   }
@@ -127,6 +99,7 @@ const allCandidates = computed<FlashcardCandidate[]>(() => {
 })
 
 const candidates = computed(() => {
+  if (audioSource.value !== 'human') return allCandidates.value
   const sameSpeakerCandidates = allCandidates.value.filter((candidate) => candidate.sameSpeaker)
   return sameSpeakerCandidates.length ? sameSpeakerCandidates : allCandidates.value
 })
@@ -136,23 +109,7 @@ const usesSameSpeakerOnly = computed(() =>
 )
 
 function buildQuestionSet(count: number): FlashcardQuestion[] {
-  const pool: FlashcardQuestion[] = candidates.value.flatMap((candidate) => [
-    { ...candidate, targetSide: 'a' as const, answerOrder: shuffle<FlashcardSide>(['a', 'b']) },
-    { ...candidate, targetSide: 'b' as const, answerOrder: shuffle<FlashcardSide>(['a', 'b']) },
-  ])
-
-  if (!pool.length) return []
-
-  const result: FlashcardQuestion[] = []
-  while (result.length < count) {
-    const cycle = shuffle(pool).map((question) => ({
-      ...question,
-      answerOrder: shuffle<FlashcardSide>(['a', 'b']),
-    }))
-    result.push(...cycle.slice(0, count - result.length))
-  }
-
-  return result
+  return buildComparisonQuestions(candidates.value, count)
 }
 
 const currentQuestion = computed(() => questions.value[currentIndex.value])
@@ -214,42 +171,55 @@ const worstFinals = computed<FinalErrorSummary[]>(() => {
 })
 
 function resetQuestionState(): void {
+  comparisonAudio.stop()
   answer.value = null
   revealedOnly.value = false
   hasPlayed.value = false
-  audioError.value = ''
+  comparisonAudio.clearError()
 }
 
 function cancelAutomation(): void {
   automationGeneration += 1
   studyRunning.value = false
   automationStatus.value = ''
-  stopHumanAudio()
+  comparisonAudio.stop()
 }
 
 async function playCurrentAudio(repetitions = 1, generation?: number): Promise<void> {
+  const question = currentQuestion.value
   const sample = currentSample.value
-  if (!sample || audioLoading.value) return
+  if (!question || !sample) return
 
-  audioLoading.value = true
-  audioError.value = ''
-
-  try {
-    const safeRepetitions = Math.min(Math.max(Math.trunc(repetitions), 1), AUTO_REPETITIONS)
-    for (let index = 0; index < safeRepetitions; index += 1) {
-      if (generation !== undefined && generation !== automationGeneration) break
-      await playHumanAudio(sample)
-      if (generation !== undefined && generation !== automationGeneration) break
-      if (autoRepeat.value && index < safeRepetitions - 1 && repeatDelayMs.value > 0) {
-        await wait(repeatDelayMs.value)
-      }
+  const safeRepetitions = Math.min(Math.max(Math.trunc(repetitions), 1), AUTO_REPETITIONS)
+  for (let index = 0; index < safeRepetitions; index += 1) {
+    if (generation !== undefined && generation !== automationGeneration) return
+    // A pergunta é auditiva: nunca publica uma pista visual sobre a resposta.
+    const completed = await comparisonAudio.playSide(question.targetSide, sample, { visualFeedback: false })
+    if (!completed || (generation !== undefined && generation !== automationGeneration)) return
+    if (autoRepeat.value && index < safeRepetitions - 1 && repeatDelayMs.value > 0) {
+      await wait(repeatDelayMs.value)
     }
-    if (generation === undefined || generation === automationGeneration) hasPlayed.value = true
-  } catch {
-    audioError.value = 'Não foi possível reproduzir o áudio desta questão.'
-  } finally {
-    audioLoading.value = false
   }
+  if (generation === undefined || generation === automationGeneration) hasPlayed.value = true
+}
+
+async function playContrastAudio(question: FlashcardQuestion): Promise<void> {
+  // Contrasta os dois lados sem alterar a preferência de repetição automática.
+  await comparisonAudio.playContrast(question.sampleA, question.sampleB, { gapMs: repeatDelayMs.value })
+}
+
+function sampleForSide(question: FlashcardQuestion, side: FlashcardSide): PlayableAudioSample {
+  return side === 'a' ? question.sampleA : question.sampleB
+}
+
+function initialForSide(side: FlashcardSide): string {
+  return side === 'a' ? initialA.value : initialB.value
+}
+
+function playIndividualAudio(side: FlashcardSide): void {
+  const question = currentQuestion.value
+  if (!question) return
+  void comparisonAudio.playSide(side, sampleForSide(question, side))
 }
 
 function answerQuestion(side: FlashcardSide): void {
@@ -272,7 +242,8 @@ function answerQuestion(side: FlashcardSide): void {
     correct,
   })
 
-  if (autoRepeat.value) void playCurrentAudio(AUTO_REPETITIONS)
+  // Depois de qualquer resposta, o contraste completo torna explícitos os dois lados.
+  void playContrastAudio(question)
 }
 
 function revealCurrentQuestion(replay = true): void {
@@ -369,7 +340,7 @@ watch(studyMode, (enabled) => {
 
   if (studyRunning.value) {
     cancelAutomation()
-    audioError.value = 'Modo automático desativado. Você pode continuar esta sessão manualmente.'
+    comparisonAudio.setError('Modo automático desativado. Você pode continuar esta sessão manualmente.')
   }
 })
 
@@ -414,11 +385,11 @@ onBeforeUnmount(cancelAutomation)
 
         <p v-if="initialA === initialB" class="selection-notice">Escolha duas iniciais diferentes.</p>
         <p v-else-if="!candidates.length" class="selection-notice">
-          Ainda não há combinações com áudio humano nos dois lados para estas iniciais.
+          Ainda não há combinações disponíveis com a fonte de áudio selecionada para estas iniciais.
         </p>
         <p v-else class="session-source-note">
           {{ candidates.length }} combinações de final/tom disponíveis.
-          {{ usesSameSpeakerOnly ? 'O teste usará pares gravados pelo mesmo falante.' : 'Alguns pares disponíveis usam falantes diferentes.' }}
+          {{ audioSource === 'human' && usesSameSpeakerOnly ? 'O teste usará pares gravados pelo mesmo falante.' : audioSource === 'human' ? 'Alguns pares disponíveis usam falantes diferentes.' : 'A fonte escolhida é resolvida individualmente para cada lado.' }}
         </p>
       </div>
 
@@ -429,28 +400,50 @@ onBeforeUnmount(cancelAutomation)
         </div>
 
         <p class="flashcard-round-label">Qual inicial você ouviu?</p>
-        <button class="flashcard-player" type="button" :disabled="audioLoading || studyRunning" @click="playCurrentAudio()">
-          {{ audioLoading ? 'Carregando…' : hasPlayed ? '▶ Ouvir novamente' : '▶ Ouvir áudio' }}
+        <button class="flashcard-player" type="button" :disabled="studyRunning" @click="playCurrentAudio()">
+          {{ audioLoading ? 'Reproduzindo…' : hasPlayed ? '▶ Ouvir novamente' : '▶ Ouvir áudio' }}
         </button>
         <p v-if="automationStatus" class="automation-status" role="status">{{ automationStatus }}</p>
         <p v-else-if="!hasPlayed" class="flashcard-hint">Ouça a gravação antes de responder.</p>
 
         <div v-if="!studyRunning" class="flashcard-choices">
-          <button
+          <div
             v-for="side in currentQuestion.answerOrder"
             :key="side"
-            type="button"
-            :disabled="!hasPlayed || answer !== null"
             :class="{
+              'flashcard-choice': true,
               selected: answer === side,
               correct: answer !== null && currentQuestion.targetSide === side,
               wrong: !revealedOnly && answer === side && currentQuestion.targetSide !== side,
+              'is-active': answer !== null && activeSide === side,
+              'is-dimmed': answer !== null && activeSide !== null && activeSide !== side,
             }"
-            @click="answerQuestion(side)"
           >
-            <span>{{ side === 'a' ? 'Inicial A' : 'Inicial B' }}</span>
-            <strong>{{ displayInitial(side === 'a' ? initialA : initialB) }}</strong>
-          </button>
+            <button
+              class="flashcard-choice-answer"
+              type="button"
+              :disabled="!hasPlayed || answer !== null"
+              @click="answerQuestion(side)"
+            >
+              <span>{{ side === 'a' ? 'Inicial A' : 'Inicial B' }}</span>
+              <strong>{{ displayInitial(initialForSide(side)) }}</strong>
+            </button>
+            <button
+              v-if="answer"
+              class="flashcard-choice-audio"
+              type="button"
+              :aria-label="`Ouvir ${displayInitial(initialForSide(side))} no tom ${currentQuestion.tone === 5 ? 'neutro' : currentQuestion.tone}`"
+              :aria-pressed="activeSide === side"
+              @click="playIndividualAudio(side)"
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 5 6 9H2v6h4l5 4z" />
+                <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+                <path d="M19 5a10 10 0 0 1 0 14" />
+              </svg>
+              <span class="visually-hidden">Ouvir {{ displayInitial(initialForSide(side)) }}</span>
+            </button>
+          </div>
         </div>
 
         <div v-if="answer" class="flashcard-result" :class="revealedOnly ? 'study' : answerIsCorrect ? 'correct' : 'wrong'" role="status">

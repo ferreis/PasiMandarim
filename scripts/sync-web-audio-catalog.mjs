@@ -70,7 +70,7 @@ async function fetchTree() {
   const response = await fetch(treeUrl, {
     headers: {
       Accept: 'application/vnd.github+json',
-      'User-Agent': 'learning-Mandarin-static-catalog',
+      'User-Agent': 'pasi-mandarim-static-catalog',
     },
   })
 

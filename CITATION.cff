@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "Se este projeto foi útil em seu trabalho, pesquisa, artigo, software ou material educacional, considere citá-lo."
+title: "Pasi Mandarim"
+type: software
+authors:
+  - family-names: "Mecabô"
+    given-names: "Rafael Fernando dos Reis"
+repository-code: "https://github.com/ferreis/learning_Mandarin"
+license: "AGPL-3.0-only"
