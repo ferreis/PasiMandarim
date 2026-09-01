@@ -112,17 +112,19 @@ test('reproduz a comparação dos dois lados quando a resposta da comparação e
 
   await page.getByRole('button', { name: 'Iniciar sessão' }).click()
   await expect(page.getByText('Questão 1 de 5')).toBeVisible()
-  await page.evaluate(() => { window.__audioCalls.length = 0 })
 
   for (let attempt = 0; attempt < 12; attempt += 1) {
+    await page.getByRole('button', { name: /Ouvir áudio|Ouvir novamente/ }).click()
+    await page.evaluate(() => { window.__audioCalls.length = 0 })
+
     const buttons = page.locator('.flashcard-choices button')
     const count = await buttons.count()
     if (count === 0) break
+    await expect(buttons.nth(0)).toBeEnabled()
     await buttons.nth(0).click()
     const resultText = await page.locator('.flashcard-result strong').textContent().catch(() => '')
     if (resultText?.includes('Incorreto')) {
-      const audioCalls = await page.evaluate(() => window.__audioCalls.length)
-      expect(audioCalls).toBeGreaterThanOrEqual(2)
+      await expect.poll(async () => page.evaluate(() => window.__audioCalls.length)).toBeGreaterThanOrEqual(2)
       return
     }
     await page.getByRole('button', { name: 'Próximo flashcard' }).click()

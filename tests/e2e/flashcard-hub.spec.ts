@@ -92,7 +92,8 @@ test('salva e reaplica as configurações gerais dos flashcards', async ({ page 
   await expect(page.getByLabel('Tempo entre as repetições automáticas')).toHaveValue('1500')
 
   await page.goto('/#/flashcards/pronunciation')
-  await expect(page.locator('.pronunciation-session-setup select')).toHaveValue('50')
+  await page.getByRole('button', { name: 'Gerar flashcards de pronúncia' }).click()
+  await expect(page.getByText('Flashcard 1 de 50')).toBeVisible()
 })
 
 test('descarta valores de configuração inválidos salvos no navegador', async ({ page }) => {
@@ -117,12 +118,9 @@ test('gera a quantidade escolhida de flashcards de pronúncia', async ({ page })
   await page.getByLabel('Quantidade padrão de flashcards').selectOption('5')
   await page.goto('/#/flashcards/pronunciation')
 
-  const quantity = page.locator('.pronunciation-session-setup select')
-  await expect(quantity).toHaveValue('5')
   await page.getByRole('button', { name: 'Gerar flashcards de pronúncia' }).click()
 
   await expect(page.getByText('Flashcard 1 de 5')).toBeVisible()
-  await expect(quantity).toBeDisabled()
 
   const pronunciationSelectors = page.locator('.pronunciation-selectors select')
   await expect(pronunciationSelectors).toHaveCount(3)

@@ -40,9 +40,14 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Instalar FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends ffmpeg
+
       - name: Gerar áudios TTS estáticos
         run: |
-          pip install edge-tts
+          python -m pip install --disable-pip-version-check --no-input edge-tts==7.2.8
           npm run audio:tts:sync
 
       - name: Baixar áudios humanos dos pares tonais

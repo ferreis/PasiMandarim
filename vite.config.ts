@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/learning_Mandarin/' : '/',
+export default defineConfig({
+  base: '/',
   plugins: [vue()],
-}))
+})
