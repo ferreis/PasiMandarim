@@ -36,10 +36,39 @@ test('usa a quantidade global na comparação sem mostrar um controle local', as
   await setSettings(page, { quantity: 5, autoRepeat: false, studyMode: false, repeatDelayMs: 500 })
   await page.goto('/#/flashcards/comparison')
 
-  await expect(page.locator('.flashcard-setup-grid select')).toHaveCount(2)
+  await expect(page.locator('.flashcard-setup-grid select')).toHaveCount(3)
   await expect(page.locator('.flashcard-setup-grid').getByText('Quantidade', { exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Iniciar sessão' }).click()
   await expect(page.getByText('Questão 1 de 5')).toBeVisible()
+})
+
+test('permite escolher e salvar qual tipo da final i será treinado', async ({ page }) => {
+  await page.goto('/#/flashcards/settings')
+
+  await expect(page.getByRole('radio', { name: /Ambos os tipos/i })).toBeChecked()
+  await expect(page.getByText(/Em zi\/ci\/si e zhi\/chi\/shi\/ri, a letra i não tem o mesmo som/i)).toBeVisible()
+
+  await page.getByRole('radio', { name: /i especial/i }).check()
+  const stored = await page.evaluate(() => localStorage.getItem('learning-mandarin:flashcard-settings:v1'))
+  expect(stored).toContain('"iFinalMode":"special"')
+
+  await page.goto('/#/flashcards/comparison')
+  await expect(page.getByLabel('Tipo da final i')).toHaveValue('special')
+})
+
+test('avisa quando um par mistura o i vocálico e o i especial', async ({ page }) => {
+  await page.goto('/#/flashcards/comparison')
+
+  const setupSelects = page.locator('.flashcard-setup-grid select')
+  await setupSelects.nth(0).selectOption('z')
+  await setupSelects.nth(1).selectOption('j')
+
+  const notice = page.getByRole('note')
+  await expect(notice).toContainText('z usa i especial')
+  await expect(notice).toContainText('j usa i vocálico')
+
+  await page.getByLabel('Tipo da final i').selectOption('vocalic')
+  await expect(notice).toContainText('Com o filtro “i vocálico”, a final i fica fora desta sessão.')
 })
 
 test('configura a fonte TTS e revela a escolha de voz somente quando aplicável', async ({ page }) => {
