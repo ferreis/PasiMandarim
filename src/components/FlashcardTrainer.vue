@@ -16,6 +16,12 @@ import {
   saveFlashcardAttempt,
   type FlashcardAttempt,
 } from '../services/flashcardStats'
+import {
+  describeIFinalKind,
+  getIFinalKind,
+  iFinalModeOptions,
+  matchesIFinalMode,
+} from '../services/pinyinIFinal'
 import { buildToneMarkedPinyin } from '../utils/pinyin'
 import type { MandarinTone, PlayableAudioSample } from '../types/audio'
 
@@ -41,6 +47,7 @@ const studyMode = toRef(flashcardSettings, 'studyMode')
 const repeatDelayMs = toRef(flashcardSettings, 'repeatDelayMs')
 const audioSource = toRef(flashcardSettings, 'audioSource')
 const ttsVoice = toRef(flashcardSettings, 'ttsVoice')
+const iFinalMode = toRef(flashcardSettings, 'iFinalMode')
 const attempts = ref<FlashcardAttempt[]>(loadFlashcardAttempts())
 const comparisonAudio = useComparisonAudioFeedback()
 
@@ -76,12 +83,44 @@ function waitAutomation(milliseconds: number, generation: number): Promise<boole
   })
 }
 
+const commonFinals = computed(() => {
+  if (initialA.value === initialB.value) return []
+  return getCommonFinals(initialA.value, initialB.value)
+})
+
+const selectedIFinalModeLabel = computed(() =>
+  iFinalModeOptions.find((option) => option.value === iFinalMode.value)?.label ?? 'Ambos os tipos',
+)
+
+const iFinalNotice = computed(() => {
+  if (!commonFinals.value.includes('i')) return ''
+
+  const kindA = getIFinalKind(initialA.value, 'i')
+  const kindB = getIFinalKind(initialB.value, 'i')
+  const filterExcludesI = !matchesIFinalMode(initialA.value, initialB.value, 'i', iFinalMode.value)
+  const filterMessage = iFinalMode.value !== 'both' && filterExcludesI
+    ? ` Com o filtro “${selectedIFinalModeLabel.value}”, a final i fica fora desta sessão.`
+    : ''
+
+  if (kindA !== kindB) {
+    return `${displayInitial(initialA.value)} usa ${describeIFinalKind(kindA)}, enquanto ${displayInitial(initialB.value)} usa ${describeIFinalKind(kindB)}. A mesma letra i representa realizações diferentes neste par.${filterMessage}`
+  }
+
+  if (kindA === 'special') {
+    return `Neste par, i pertence ao grupo especial de zi/ci/si e zhi/chi/shi/ri. Dentro desse grupo, z/c/s e zh/ch/sh/r ainda têm realizações diferentes.${filterMessage}`
+  }
+
+  return `Neste par, i é o i vocálico, como em yi, bi, pi, mi, di, ti, ni, li, ji, qi e xi.${filterMessage}`
+})
+
 const allCandidates = computed<FlashcardCandidate[]>(() => {
   if (initialA.value === initialB.value) return []
 
   const candidates: FlashcardCandidate[] = []
 
-  for (const final of getCommonFinals(initialA.value, initialB.value)) {
+  for (const final of commonFinals.value) {
+    if (!matchesIFinalMode(initialA.value, initialB.value, final, iFinalMode.value)) continue
+
     for (const tone of [1, 2, 3, 4, 5] as MandarinTone[]) {
       const resolved = resolveComparisonAudio(
         initialA.value, initialB.value, final, tone, audioSource.value, resolveFlashcardTtsVoice(ttsVoice.value),
@@ -378,14 +417,26 @@ onBeforeUnmount(cancelAutomation)
             </select>
           </label>
 
+          <label>
+            <span class="field-label">Final i</span>
+            <select v-model="iFinalMode" :disabled="sessionActive" aria-label="Tipo da final i">
+              <option v-for="option in iFinalModeOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
           <button class="primary-action" type="button" :disabled="!candidates.length || sessionActive" @click="startSession">
             Iniciar sessão
           </button>
         </div>
 
+        <p v-if="iFinalNotice" class="selection-notice" role="note">
+          <strong>Sobre a final i:</strong> {{ iFinalNotice }}
+        </p>
         <p v-if="initialA === initialB" class="selection-notice">Escolha duas iniciais diferentes.</p>
         <p v-else-if="!candidates.length" class="selection-notice">
-          Ainda não há combinações disponíveis com a fonte de áudio selecionada para estas iniciais.
+          Ainda não há combinações disponíveis com a fonte de áudio e o filtro da final i selecionados para estas iniciais.
         </p>
         <p v-else class="session-source-note">
           {{ candidates.length }} combinações de final/tom disponíveis.

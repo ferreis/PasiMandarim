@@ -7,6 +7,7 @@ import {
   formatRepeatDelay,
   resetFlashcardSettings,
 } from '../services/flashcardSettings'
+import { iFinalModeOptions } from '../services/pinyinIFinal'
 </script>
 
 <template>
@@ -28,6 +29,26 @@ import {
           </option>
         </select>
       </label>
+
+      <fieldset class="flashcard-setting-row flashcard-i-final">
+        <legend>
+          <strong>Final i do Pinyin</strong>
+          <small>
+            Em zi/ci/si e zhi/chi/shi/ri, a letra i não tem o mesmo som do i vocálico de
+            yi/bi/pi/mi/di/ti/ni/li/ji/qi/xi. Dentro do grupo especial, z/c/s e zh/ch/sh/r ainda têm
+            realizações diferentes.
+          </small>
+        </legend>
+        <div class="flashcard-i-final-options" role="radiogroup" aria-label="Tipo da final i">
+          <label v-for="option in iFinalModeOptions" :key="option.value">
+            <input v-model="flashcardSettings.iFinalMode" type="radio" name="i-final-mode" :value="option.value" />
+            <span>
+              <strong>{{ option.label }}</strong>
+              <small>{{ option.description }}</small>
+            </span>
+          </label>
+        </div>
+      </fieldset>
 
       <label class="flashcard-setting-row flashcard-setting-toggle">
         <span>
@@ -88,5 +109,5 @@ import {
 </template>
 
 <style scoped>
-.flashcard-settings{display:grid;gap:24px;max-width:960px;margin:0 auto}.flashcard-settings-heading{display:grid;gap:6px}.flashcard-settings-heading h2{margin:0;font-size:clamp(1.35rem,2vw,1.75rem)}.flashcard-settings-heading p{margin:0;color:#62707d;line-height:1.6}.flashcard-settings-list{display:grid;border:1px solid #d9e0e7;border-radius:18px;overflow:hidden}.flashcard-setting-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,220px);align-items:center;gap:24px;padding:20px;background:#fff;border:0;margin:0;min-width:0}.flashcard-setting-row+.flashcard-setting-row{border-top:1px solid #e5eaef}.flashcard-setting-row>span,.flashcard-setting-row legend{display:grid;gap:5px;padding:0}.flashcard-setting-row strong{font-size:1rem}.flashcard-setting-row small{color:#62707d;line-height:1.5}.flashcard-setting-row select{width:100%;min-height:44px}.flashcard-setting-toggle{grid-template-columns:minmax(0,1fr) auto}.flashcard-setting-toggle input{width:24px;height:24px;accent-color:#17202a}.flashcard-audio-source{grid-template-columns:minmax(0,1fr) minmax(250px,1.25fr)}.flashcard-audio-options{display:grid;gap:8px}.flashcard-audio-options label{display:flex;align-items:center;gap:8px;font-weight:650;cursor:pointer}.flashcard-audio-options input{width:18px;height:18px;accent-color:#17202a}.flashcard-settings-footer{display:flex;align-items:center;justify-content:space-between;gap:20px}.flashcard-settings-footer p{margin:0;color:#62707d;font-size:.9rem}.flashcard-settings-footer button{min-height:42px;padding:0 16px;border:1px solid #cbd4dc;border-radius:12px;background:#fff;color:#17202a;font-weight:700;cursor:pointer}.flashcard-settings-footer button:hover{background:#f5f7f9}@media(max-width:680px){.flashcard-setting-row,.flashcard-setting-toggle,.flashcard-audio-source{grid-template-columns:1fr;gap:12px}.flashcard-setting-toggle input{justify-self:start}.flashcard-settings-footer{align-items:flex-start;flex-direction:column}}
+.flashcard-settings{display:grid;gap:24px;max-width:960px;margin:0 auto}.flashcard-settings-heading{display:grid;gap:6px}.flashcard-settings-heading h2{margin:0;font-size:clamp(1.35rem,2vw,1.75rem)}.flashcard-settings-heading p{margin:0;color:#62707d;line-height:1.6}.flashcard-settings-list{display:grid;border:1px solid #d9e0e7;border-radius:18px;overflow:hidden}.flashcard-setting-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,220px);align-items:center;gap:24px;padding:20px;background:#fff;border:0;margin:0;min-width:0}.flashcard-setting-row+.flashcard-setting-row{border-top:1px solid #e5eaef}.flashcard-setting-row>span,.flashcard-setting-row legend{display:grid;gap:5px;padding:0}.flashcard-setting-row strong{font-size:1rem}.flashcard-setting-row small{color:#62707d;line-height:1.5}.flashcard-setting-row select{width:100%;min-height:44px}.flashcard-setting-toggle{grid-template-columns:minmax(0,1fr) auto}.flashcard-setting-toggle input{width:24px;height:24px;accent-color:#17202a}.flashcard-audio-source,.flashcard-i-final{grid-template-columns:minmax(0,1fr) minmax(250px,1.25fr)}.flashcard-audio-options,.flashcard-i-final-options{display:grid;gap:8px}.flashcard-audio-options label{display:flex;align-items:center;gap:8px;font-weight:650;cursor:pointer}.flashcard-audio-options input{width:18px;height:18px;accent-color:#17202a}.flashcard-i-final-options label{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:start;gap:9px;cursor:pointer}.flashcard-i-final-options label>span{display:grid;gap:2px}.flashcard-i-final-options input{width:18px;height:18px;margin-top:2px;accent-color:#17202a}.flashcard-settings-footer{display:flex;align-items:center;justify-content:space-between;gap:20px}.flashcard-settings-footer p{margin:0;color:#62707d;font-size:.9rem}.flashcard-settings-footer button{min-height:42px;padding:0 16px;border:1px solid #cbd4dc;border-radius:12px;background:#fff;color:#17202a;font-weight:700;cursor:pointer}.flashcard-settings-footer button:hover{background:#f5f7f9}@media(max-width:680px){.flashcard-setting-row,.flashcard-setting-toggle,.flashcard-audio-source,.flashcard-i-final{grid-template-columns:1fr;gap:12px}.flashcard-setting-toggle input{justify-self:start}.flashcard-settings-footer{align-items:flex-start;flex-direction:column}}
 </style>

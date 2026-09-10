@@ -1,5 +1,6 @@
 import { reactive, watch } from 'vue'
 import type { TtsVoiceId } from '../types/audio'
+import { iFinalModeOptions, type IFinalMode } from './pinyinIFinal'
 
 export const FLASHCARD_SETTINGS_STORAGE_KEY = 'learning-mandarin:flashcard-settings:v1'
 export const flashcardQuantityOptions = [5, 10, 20, 30, 50] as const
@@ -25,6 +26,7 @@ export type FlashcardSettings = {
   repeatDelayMs: FlashcardRepeatDelay
   audioSource: FlashcardAudioSource
   ttsVoice: FlashcardTtsVoiceSelection
+  iFinalMode: IFinalMode
 }
 
 const defaults: FlashcardSettings = {
@@ -34,6 +36,7 @@ const defaults: FlashcardSettings = {
   repeatDelayMs: 500,
   audioSource: 'human',
   ttsVoice: 'recommended',
+  iFinalMode: 'both',
 }
 
 function includesNumber<T extends readonly number[]>(options: T, value: unknown): value is T[number] {
@@ -56,6 +59,7 @@ function loadSettings(): FlashcardSettings {
       repeatDelayMs: includesNumber(flashcardRepeatDelayOptions, parsed.repeatDelayMs) ? parsed.repeatDelayMs : defaults.repeatDelayMs,
       audioSource: includesString(flashcardAudioSourceOptions, parsed.audioSource) ? parsed.audioSource : defaults.audioSource,
       ttsVoice: includesString(flashcardTtsVoiceOptions.map((option) => option.value), parsed.ttsVoice) ? parsed.ttsVoice : defaults.ttsVoice,
+      iFinalMode: includesString(iFinalModeOptions.map((option) => option.value), parsed.iFinalMode) ? parsed.iFinalMode : defaults.iFinalMode,
     }
   } catch {
     return { ...defaults }
